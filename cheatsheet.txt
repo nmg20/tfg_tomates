@@ -1,0 +1,11 @@
+!pip install -r requirements.txt
+
+# Si salta el mensaje de error '"python setup.py egg_info" failed with error code 1 in ...'
+!python -m pip install -U pip
+
+# Instalar requirements.txt otra vez
+
+# Si se queda demasiado tiempo en "Building wheels for collected packages: opencv-python-headless":
+! pip install --upgrade pip setuptools wheel
+o sino tambien:
+! pip install opencv-python==4.3.0.38
