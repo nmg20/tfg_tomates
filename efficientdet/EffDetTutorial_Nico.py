@@ -10,7 +10,7 @@ from matplotlib import patches
 
 from pycocotools import coco, cocoeval, mask
 
-dataset_path = Path("../tomates512/")
+dataset_path = Path("../../tomates512/")
 train_data_path = dataset_path/"images/train/"
 test_data_path = dataset_path/"images/test/"
 val_data_path = dataset_path/"images/val/"
