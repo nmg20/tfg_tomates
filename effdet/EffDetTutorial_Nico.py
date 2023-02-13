@@ -123,10 +123,10 @@ from effdet.config.model_config import efficientdet_model_param_dict
 
 import timm
 
-def create_model(num_classes=1, image_size=512, architecture="tf_efficientnetv2_l"):
-    efficientdet_model_param_dict['tf_efficientnetv2_l'] = dict(
-        name='tf_efficientnetv2_l',
-        backbone_name='tf_efficientnetv2_l',
+def create_model(num_classes=1, image_size=512, architecture="tf_efficientnetv2_b0"):
+    efficientdet_model_param_dict['tf_efficientnetv2_b0'] = dict(
+        name='tf_efficientnetv2_b0',
+        backbone_name='tf_efficientnetv2_b0',
         backbone_args=dict(drop_path_rate=0.2),
         num_classes=num_classes,
         url='', )
@@ -366,7 +366,7 @@ class EfficientDetModel(LightningModule):
         learning_rate=0.0002,
         wbf_iou_threshold=0.44,
         inference_transforms=get_valid_transforms(target_img_size=512),
-        model_architecture='tf_efficientnetv2_l',
+        model_architecture='tf_efficientnetv2_b0',
     ):
         super().__init__()
         self.img_size = img_size
@@ -493,6 +493,8 @@ class EfficientDetModel(LightningModule):
             num_images=images_tensor.shape[0]
         )
 
+        print(f"\n\n\n{self.model(images_tensor.to(self.device), dummy_targets)}\n\n\n")
+
         detections = self.model(images_tensor.to(self.device), dummy_targets)[
             "detections"
         ]
@@ -582,7 +584,7 @@ model = EfficientDetModel(
 from pytorch_lightning import Trainer 
 
 trainer = Trainer(
-        gpus=1, max_epochs=5, num_sanity_val_steps=1,
+        gpus=[0], max_epochs=5, num_sanity_val_steps=1,
     )
 trainer.fit(model,dm)
 
