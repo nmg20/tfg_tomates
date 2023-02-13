@@ -566,3 +566,7 @@ class EfficientDetModel(LightningModule):
                 scaled_bboxes.append(bboxes)
 
         return scaled_bboxes
+
+def load_model(path):
+    return EfficientDetModel.load_from_checkpoint(path)
+
