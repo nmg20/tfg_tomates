@@ -8,7 +8,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib import patches
 
-from pycocotools import coco, cocoeval, mask
+# from pycocotools import coco, cocoeval, mask
 
 dataset_path = Path("../../tomates512/")
 train_data_path = dataset_path/"images/train/"
@@ -566,6 +566,25 @@ class EfficientDetModel(LightningModule):
                 scaled_bboxes.append(bboxes)
 
         return scaled_bboxes
+
+def compare_bboxes_for_image(
+    image,
+    predicted_bboxes,
+    actual_bboxes,
+    draw_bboxes_fn=draw_pascal_voc_bboxes,
+    figsize=(20, 20),
+    ):
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
+    ax1.imshow(image)
+    ax1.set_title("Prediction")
+    ax2.imshow(image)
+    ax2.set_title("Actual")
+
+    draw_bboxes_fn(ax1, predicted_bboxes)
+    draw_bboxes_fn(ax2, actual_bboxes)
+
+    plt.show()
+
 
 def load_model(path):
     return EfficientDetModel.load_from_checkpoint(path)

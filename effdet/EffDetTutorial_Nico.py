@@ -8,7 +8,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib import patches
 
-from pycocotools import coco, cocoeval, mask
+# from pycocotools import coco, cocoeval, mask
 
 dataset_path = Path("../../tomates512/")
 train_data_path = dataset_path/"images/train/"
