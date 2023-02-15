@@ -3,12 +3,8 @@ from effdet import get_efficientdet_config, EfficientDet, DetBenchTrain
 from effdet.efficientdet import HeadNet
 from effdet.config.model_config import efficientdet_model_param_dict
 
-# print(f'number of configs: {len(efficientdet_model_param_dict)}')
-# list(efficientdet_model_param_dict.keys())[::3]
-
 import timm
-
-# timm.list_models('tf_efficientnetv2_*')
+import dataset
 
 def create_model(num_classes=1, image_size=512, architecture="tf_efficientnetv2_l"):
     efficientdet_model_param_dict['tf_efficientnetv2_l'] = dict(
@@ -83,7 +79,7 @@ class EfficientDetModel(LightningModule):
         prediction_confidence_threshold=0.2,
         learning_rate=0.0002,
         wbf_iou_threshold=0.44,
-        inference_transforms=get_valid_transforms(target_img_size=512),
+        inference_transforms=dataset.get_valid_transforms(target_img_size=512),
         model_architecture='tf_efficientnetv2_l',
     ):
         super().__init__()

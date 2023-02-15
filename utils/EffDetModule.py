@@ -493,8 +493,6 @@ class EfficientDetModel(LightningModule):
             num_images=images_tensor.shape[0]
         )
 
-        print(f"\n\n\n{self.model(images_tensor.to(self.device), dummy_targets)}\n\n\n")
-
         detections = self.model(images_tensor.to(self.device), dummy_targets)[
             "detections"
         ]
@@ -569,34 +567,6 @@ class EfficientDetModel(LightningModule):
 
         return scaled_bboxes
 
-####################
-
-dm = EfficientDetDataModule(train_dataset_adaptor=tomato_train_ds, 
-        validation_dataset_adaptor=tomato_train_ds,
-        num_workers=4,
-        batch_size=2)
-
-model = EfficientDetModel(
-    num_classes=1,
-    img_size=512
-    )
-
-from pytorch_lightning import Trainer 
-
-trainer = Trainer(
-        gpus=[0], max_epochs=5, num_sanity_val_steps=1,
-    )
-trainer.fit(model,dm)
-
-# ######################
-
-img1, truth_bboxes1, _, _ = tomato_train_ds.get_image_and_labels_by_idx(0)
-img2, truth_bboxes2, _, _ = tomato_train_ds.get_image_and_labels_by_idx(1)
-
-images = [img1, img2]
-
-predicted_bboxes, predicted_class_confidences, predicted_class_labels = model.predict(images)
-
 def compare_bboxes_for_image(
     image,
     predicted_bboxes,
@@ -615,4 +585,9 @@ def compare_bboxes_for_image(
 
     plt.show()
 
-compare_bboxes_for_image(img1, predicted_bboxes=predicted_bboxes[0],actual_bboxes=truth_bboxes1.tolist())
+def save_img(img, name):
+    img.save(f"{name}.jpg")
+
+def load_model(path):
+    return EfficientDetModel.load_from_checkpoint(path)
+

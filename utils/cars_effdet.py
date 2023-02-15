@@ -1,28 +1,13 @@
-# Sacado de https://gist.github.com/Chris-hughes10/73628b1d8d6fc7d359b3dcbbbb8869d7
-
 from pathlib import Path
-import PIL
-import numpy as np
 
+dataset_path = Path("../../../tomates512/")
+train_data_path = dataset_path/"images/train/"
 import pandas as pd
+
+df = pd.read_csv(dataset_path/"annotations/labelstrain.csv")
+
 import matplotlib.pyplot as plt
 from matplotlib import patches
-
-# from pycocotools import coco, cocoeval, mask
-
-dataset_path = Path("../../tomates512/")
-train_data_path = dataset_path/"images/train/"
-test_data_path = dataset_path/"images/test/"
-val_data_path = dataset_path/"images/val/"
-
-df_tr = pd.read_csv(dataset_path/"annotations/labelstrain.csv")
-df_ts = pd.read_csv(dataset_path/"annotations/labelstest.csv")
-df_vl = pd.read_csv(dataset_path/"annotations/labelsval.csv")
-
-
-##################
-#DatasetAdaptor
-##################
 
 def get_rectangle_edges_from_pascal_bbox(bbox):
     xmin_top_left, ymin_top_left, xmax_bottom_right, ymax_bottom_right = bbox
@@ -45,22 +30,22 @@ def draw_pascal_voc_bboxes(
             bottom_left,
             width,
             height,
-            linewidth=1,
-            edgecolor="red",
+            linewidth=4,
+            edgecolor="black",
             fill=False,
         )
-        # rect_2 = patches.Rectangle(
-        #     bottom_left,
-        #     width,
-        #     height,
-        #     linewidth=1,
-        #     edgecolor="white",
-        #     fill=False,
-        # )
+        rect_2 = patches.Rectangle(
+            bottom_left,
+            width,
+            height,
+            linewidth=2,
+            edgecolor="white",
+            fill=False,
+        )
 
         # Add the patch to the Axes
         plot_ax.add_patch(rect_1)
-        # plot_ax.add_patch(rect_2)
+        plot_ax.add_patch(rect_2)
 
 def show_image(
     image, bboxes=None, draw_bboxes_fn=draw_pascal_voc_bboxes, figsize=(10, 10)
@@ -73,12 +58,13 @@ def show_image(
 
     plt.show()
 
+from pathlib import Path
 
-######################
-# TomatoDatasetAdaptor
-######################
+import PIL
 
-class TomatoDatasetAdaptor:
+import numpy as np
+
+class CarsDatasetAdaptor:
     def __init__(self, images_dir_path, annotations_dataframe):
         self.images_dir_path = Path(images_dir_path)
         self.annotations_df = annotations_dataframe
@@ -101,32 +87,29 @@ class TomatoDatasetAdaptor:
         image, bboxes, class_labels, image_id = self.get_image_and_labels_by_idx(index)
         print(f"image_id: {image_id}")
         show_image(image, bboxes.tolist())
-        # print(class_labels)
+        print(class_labels)
 
-
-tomato_train_ds = TomatoDatasetAdaptor(train_data_path, df_tr)
-tomato_test_ds = TomatoDatasetAdaptor(test_data_path, df_ts)
-tomato_val_ds = TomatoDatasetAdaptor(val_data_path, df_vl)
-# tomato_train_ds.show_image(0)
-# tomato_test_ds.show_image(0)
-# tomato_val_ds.show_image(0)
-# tomato_train_ds.show_image(3)
-
-#######################
-# Creating the model
-#######################
+cars_train_ds = CarsDatasetAdaptor(train_data_path, df)
+# cars_train_ds.show_image(0)
+# cars_train_ds.show_image(3)
 
 from effdet.config.model_config import efficientdet_model_param_dict
 from effdet import get_efficientdet_config, EfficientDet, DetBenchTrain
 from effdet.efficientdet import HeadNet
 from effdet.config.model_config import efficientdet_model_param_dict
 
+print(f'number of configs: {len(efficientdet_model_param_dict)}')
+
+list(efficientdet_model_param_dict.keys())[::3]
+
 import timm
 
-def create_model(num_classes=1, image_size=512, architecture="tf_efficientnetv2_b0"):
-    efficientdet_model_param_dict['tf_efficientnetv2_b0'] = dict(
-        name='tf_efficientnetv2_b0',
-        backbone_name='tf_efficientnetv2_b0',
+timm.list_models('tf_efficientnetv2_*')
+
+def create_model(num_classes=1, image_size=512, architecture="tf_efficientnetv2_l"):
+    efficientdet_model_param_dict['tf_efficientnetv2_l'] = dict(
+        name='tf_efficientnetv2_l',
+        backbone_name='tf_efficientnetv2_l',
         backbone_args=dict(drop_path_rate=0.2),
         num_classes=num_classes,
         url='', )
@@ -144,21 +127,13 @@ def create_model(num_classes=1, image_size=512, architecture="tf_efficientnetv2_
     )
     return DetBenchTrain(net, config)
 
-#################################
-# Define the EfficientDet Dataset
-#################################
-
 from torch.utils.data import Dataset
 
 import albumentations as A
 from albumentations.pytorch.transforms import ToTensorV2
 
-# Debido a la arquitectura de EfficientDet las imágenes deben tener
-# tamaño 512x512.
 
 def get_train_transforms(target_img_size=512):
-    # random angle, random blur, flip, random noise
-    # random combination of 3, random scale, random translation
     return A.Compose(
         [
             A.HorizontalFlip(p=0.5),
@@ -171,6 +146,7 @@ def get_train_transforms(target_img_size=512):
             format="pascal_voc", min_area=0, min_visibility=0, label_fields=["labels"]
         ),
     )
+
 
 def get_valid_transforms(target_img_size=512):
     return A.Compose(
@@ -229,11 +205,6 @@ class EfficientDetDataset(Dataset):
 
     def __len__(self):
         return len(self.ds)
-
-
-#######################
-# Define the DataModule
-#######################
 
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
@@ -314,11 +285,6 @@ class EfficientDetDataModule(LightningDataModule):
 
         return images, annotations, targets, image_ids
 
-
-##########################
-# Define the training loop
-##########################
-
 from numbers import Number
 from typing import List
 from functools import singledispatch
@@ -328,9 +294,11 @@ import torch
 
 from fastcore.dispatch import typedispatch
 from pytorch_lightning import LightningModule
-# from pytorch_lightning.core.decorators import auto_move_data
+from pytorch_lightning.core.decorators import auto_move_data
+
 
 from ensemble_boxes import ensemble_boxes_wbf
+
 
 def run_wbf(predictions, image_size=512, iou_thr=0.44, skip_box_thr=0.43, weights=None):
     bboxes = []
@@ -357,6 +325,7 @@ def run_wbf(predictions, image_size=512, iou_thr=0.44, skip_box_thr=0.43, weight
 
     return bboxes, confidences, class_labels
 
+
 class EfficientDetModel(LightningModule):
     def __init__(
         self,
@@ -366,7 +335,7 @@ class EfficientDetModel(LightningModule):
         learning_rate=0.0002,
         wbf_iou_threshold=0.44,
         inference_transforms=get_valid_transforms(target_img_size=512),
-        model_architecture='tf_efficientnetv2_b0',
+        model_architecture='tf_efficientnetv2_l',
     ):
         super().__init__()
         self.img_size = img_size
@@ -379,9 +348,9 @@ class EfficientDetModel(LightningModule):
         self.inference_tfms = inference_transforms
 
 
-    # @auto_move_data
-    # def forward(self, images, targets):
-    #     return self.model(images, targets)
+    @auto_move_data
+    def forward(self, images, targets):
+        return self.model(images, targets)
 
     def configure_optimizers(self):
         return torch.optim.AdamW(self.model.parameters(), lr=self.lr)
@@ -493,8 +462,6 @@ class EfficientDetModel(LightningModule):
             num_images=images_tensor.shape[0]
         )
 
-        print(f"\n\n\n{self.model(images_tensor.to(self.device), dummy_targets)}\n\n\n")
-
         detections = self.model(images_tensor.to(self.device), dummy_targets)[
             "detections"
         ]
@@ -569,10 +536,8 @@ class EfficientDetModel(LightningModule):
 
         return scaled_bboxes
 
-####################
-
-dm = EfficientDetDataModule(train_dataset_adaptor=tomato_train_ds, 
-        validation_dataset_adaptor=tomato_train_ds,
+dm = EfficientDetDataModule(train_dataset_adaptor=cars_train_ds, 
+        validation_dataset_adaptor=cars_train_ds,
         num_workers=4,
         batch_size=2)
 
@@ -581,29 +546,24 @@ model = EfficientDetModel(
     img_size=512
     )
 
-from pytorch_lightning import Trainer 
-
+from pytorch_lightning import Trainer
 trainer = Trainer(
-        gpus=[0], max_epochs=5, num_sanity_val_steps=1,
+        gpus=[0], max_epochs=1, num_sanity_val_steps=1,
     )
-trainer.fit(model,dm)
+trainer.fit(model, dm)
+torch.save(model.state_dict(), 'trained_effdet')
 
-# ######################
-
-img1, truth_bboxes1, _, _ = tomato_train_ds.get_image_and_labels_by_idx(0)
-img2, truth_bboxes2, _, _ = tomato_train_ds.get_image_and_labels_by_idx(1)
-
-images = [img1, img2]
+image1, truth_bboxes1, _, _ = cars_train_ds.get_image_and_labels_by_idx(0)
+image2, truth_bboxes2, _, _ = cars_train_ds.get_image_and_labels_by_idx(1)
+images = [image1, image2]
 
 predicted_bboxes, predicted_class_confidences, predicted_class_labels = model.predict(images)
-
 def compare_bboxes_for_image(
     image,
     predicted_bboxes,
     actual_bboxes,
     draw_bboxes_fn=draw_pascal_voc_bboxes,
-    figsize=(20, 20),
-    ):
+    figsize=(20, 20),):
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
     ax1.imshow(image)
     ax1.set_title("Prediction")
@@ -615,4 +575,5 @@ def compare_bboxes_for_image(
 
     plt.show()
 
-compare_bboxes_for_image(img1, predicted_bboxes=predicted_bboxes[0],actual_bboxes=truth_bboxes1.tolist())
+compare_bboxes_for_image(image1, predicted_bboxes=predicted_bboxes[0], actual_bboxes=truth_bboxes1.tolist())
+compare_bboxes_for_image(image2, predicted_bboxes=predicted_bboxes[1], actual_bboxes=truth_bboxes2.tolist())

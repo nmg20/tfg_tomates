@@ -1,6 +1,6 @@
 from pathlib import Path
 import pandas as pd
-import TomatoDatasetAdaptor, DataModule, Model, TrainingLoop
+import model
 
 dataset_path = Path("../../../tomates512/")
 train_data_path = dataset_path/"images/train/"
