@@ -22,7 +22,7 @@ dm = DataModule.EfficientDetDataModule(train_dataset_adaptor=tomato_train_ds,
         num_workers=4,
         batch_size=2)
 
-model = EfficientDetModel(
+model = Model.EfficientDetModel(
     num_classes=1,
     img_size=512
     )
@@ -34,7 +34,7 @@ model = EfficientDetModel(
 from pytorch_lightning import Trainer 
 
 trainer = Trainer(
-        gpus=[0], max_epochs=5, num_sanity_val_steps=1,
+        gpus=[0], max_epochs=1, num_sanity_val_steps=1,
     )
 trainer.fit(model,dm)
 
