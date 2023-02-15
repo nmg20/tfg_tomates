@@ -11,13 +11,13 @@ df_tr = pd.read_csv(dataset_path/"annotations/labelstrain.csv")
 df_ts = pd.read_csv(dataset_path/"annotations/labelstest.csv")
 df_vl = pd.read_csv(dataset_path/"annotations/labelsval.csv")
 
-tomato_train_ds = TomatoDatasetAdaptor(train_data_path, df_tr)
-tomato_test_ds = TomatoDatasetAdaptor(test_data_path, df_ts)
-tomato_val_ds = TomatoDatasetAdaptor(val_data_path, df_vl)
+tomato_train_ds = TomatoDatasetAdaptor.TomatoDatasetAdaptor(train_data_path, df_tr)
+tomato_test_ds = TomatoDatasetAdaptor.TomatoDatasetAdaptor(test_data_path, df_ts)
+tomato_val_ds = TomatoDatasetAdaptor.TomatoDatasetAdaptor(val_data_path, df_vl)
 
 ############################
 
-dm = EfficientDetDataModule(train_dataset_adaptor=tomato_train_ds, 
+dm = DataModule.EfficientDetDataModule(train_dataset_adaptor=tomato_train_ds, 
         validation_dataset_adaptor=tomato_train_ds,
         num_workers=4,
         batch_size=2)
