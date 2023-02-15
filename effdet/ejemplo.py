@@ -230,6 +230,26 @@ class EfficientDetDataset(Dataset):
     def __len__(self):
         return len(self.ds)
 
+def create_model(num_classes=1, image_size=512, architecture="tf_efficientnetv2_b0"):
+    efficientdet_model_param_dict['tf_efficientnetv2_b0'] = dict(
+        name='tf_efficientnetv2_b0',
+        backbone_name='tf_efficientnetv2_b0',
+        backbone_args=dict(drop_path_rate=0.2),
+        num_classes=num_classes,
+        url='', )
+    
+    config = get_efficientdet_config(architecture)
+    config.update({'num_classes': num_classes})
+    config.update({'image_size': (image_size, image_size)})
+    
+    print(config)
+
+    net = EfficientDet(config, pretrained_backbone=True)
+    net.class_net = HeadNet(
+        config,
+        num_outputs=config.num_classes,
+    )
+    return DetBenchTrain(net, config)
 
 class EfficientDetDataModule(LightningDataModule):
     def __init__(

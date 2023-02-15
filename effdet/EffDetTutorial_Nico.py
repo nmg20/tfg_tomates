@@ -603,7 +603,7 @@ def compare_bboxes_for_image(
     actual_bboxes,
     draw_bboxes_fn=draw_pascal_voc_bboxes,
     figsize=(20, 20),
-):
+    ):
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
     ax1.imshow(image)
     ax1.set_title("Prediction")
