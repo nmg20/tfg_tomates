@@ -2,7 +2,7 @@ from pathlib import Path
 import pandas as pd
 import TomatoDatasetAdaptor, DataModule, Model, TrainingLoop
 
-dataset_path = Path("../../tomates512/")
+dataset_path = Path("../../../tomates512/")
 train_data_path = dataset_path/"images/train/"
 test_data_path = dataset_path/"images/test/"
 val_data_path = dataset_path/"images/val/"

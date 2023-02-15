@@ -11,7 +11,7 @@ from pytorch_lightning import LightningModule
 
 from ensemble_boxes import ensemble_boxes_wbf
 
-import EfficientDetDataset, Model
+import DataModule, Model
 
 def run_wbf(predictions, image_size=512, iou_thr=0.44, skip_box_thr=0.43, weights=None):
     bboxes = []
@@ -46,7 +46,7 @@ class EfficientDetModel(LightningModule):
         prediction_confidence_threshold=0.2,
         learning_rate=0.0002,
         wbf_iou_threshold=0.44,
-        inference_transforms=get_valid_transforms(target_img_size=512),
+        inference_transforms=EfficientDetDataset.get_valid_transforms(target_img_size=512),
         model_architecture='tf_efficientnetv2_b0',
     ):
         super().__init__()
