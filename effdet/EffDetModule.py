@@ -585,10 +585,8 @@ def compare_bboxes_for_image(
 
     plt.show()
 
-i = 0
-def save_img(img):
-    img.save(f"imagen{i}.jpg")
-    i += 1
+def save_img(img, name):
+    img.save(f"{name}.jpg")
 
 def load_model(path):
     return EfficientDetModel.load_from_checkpoint(path)
