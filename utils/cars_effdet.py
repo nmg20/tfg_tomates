@@ -1,6 +1,6 @@
 from pathlib import Path
 
-dataset_path = Path("../../../tomates512/")
+dataset_path = Path("../../tomates512/")
 train_data_path = dataset_path/"images/train/"
 import pandas as pd
 
@@ -106,10 +106,10 @@ import timm
 
 timm.list_models('tf_efficientnetv2_*')
 
-def create_model(num_classes=1, image_size=512, architecture="tf_efficientnetv2_l"):
-    efficientdet_model_param_dict['tf_efficientnetv2_l'] = dict(
-        name='tf_efficientnetv2_l',
-        backbone_name='tf_efficientnetv2_l',
+def create_model(num_classes=1, image_size=512, architecture="tf_efficientnetv2_b0"):
+    efficientdet_model_param_dict['tf_efficientnetv2_b0'] = dict(
+        name='tf_efficientnetv2_b0',
+        backbone_name='tf_efficientnetv2_b0',
         backbone_args=dict(drop_path_rate=0.2),
         num_classes=num_classes,
         url='', )
@@ -335,7 +335,7 @@ class EfficientDetModel(LightningModule):
         learning_rate=0.0002,
         wbf_iou_threshold=0.44,
         inference_transforms=get_valid_transforms(target_img_size=512),
-        model_architecture='tf_efficientnetv2_l',
+        model_architecture='tf_efficientnetv2_b0',
     ):
         super().__init__()
         self.img_size = img_size
@@ -551,29 +551,29 @@ trainer = Trainer(
         gpus=[0], max_epochs=1, num_sanity_val_steps=1,
     )
 trainer.fit(model, dm)
-torch.save(model.state_dict(), 'trained_effdet')
+#torch.save(model.state_dict(), 'trained_effdet')
 
 image1, truth_bboxes1, _, _ = cars_train_ds.get_image_and_labels_by_idx(0)
 image2, truth_bboxes2, _, _ = cars_train_ds.get_image_and_labels_by_idx(1)
 images = [image1, image2]
 
 predicted_bboxes, predicted_class_confidences, predicted_class_labels = model.predict(images)
-def compare_bboxes_for_image(
-    image,
-    predicted_bboxes,
-    actual_bboxes,
-    draw_bboxes_fn=draw_pascal_voc_bboxes,
-    figsize=(20, 20),):
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
-    ax1.imshow(image)
-    ax1.set_title("Prediction")
-    ax2.imshow(image)
-    ax2.set_title("Actual")
+#def compare_bboxes_for_image(
+#    image,
+#    predicted_bboxes,
+#    actual_bboxes,
+#    draw_bboxes_fn=draw_pascal_voc_bboxes,
+#    figsize=(20, 20),):
+#    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=figsize)
+#    ax1.imshow(image)
+#    ax1.set_title("Prediction")
+#    ax2.imshow(image)
+#    ax2.set_title("Actual")
+#
+#    draw_bboxes_fn(ax1, predicted_bboxes)
+#    draw_bboxes_fn(ax2, actual_bboxes)
+#
+#    plt.show()
 
-    draw_bboxes_fn(ax1, predicted_bboxes)
-    draw_bboxes_fn(ax2, actual_bboxes)
-
-    plt.show()
-
-compare_bboxes_for_image(image1, predicted_bboxes=predicted_bboxes[0], actual_bboxes=truth_bboxes1.tolist())
-compare_bboxes_for_image(image2, predicted_bboxes=predicted_bboxes[1], actual_bboxes=truth_bboxes2.tolist())
+#compare_bboxes_for_image(image1, predicted_bboxes=predicted_bboxes[0], actual_bboxes=truth_bboxes1.tolist())
+#compare_bboxes_for_image(image2, predicted_bboxes=predicted_bboxes[1], actual_bboxes=truth_bboxes2.tolist())
