@@ -7,9 +7,9 @@ import timm
 import dataset
 
 def create_model(num_classes=1, image_size=512, architecture="tf_efficientnetv2_l"):
-    efficientdet_model_param_dict['tf_efficientnetv2_l'] = dict(
-        name='tf_efficientnetv2_l',
-        backbone_name='tf_efficientnetv2_l',
+    efficientdet_model_param_dict[architecture] = dict(
+        name=architecture,
+        backbone_name=architecture,
         backbone_args=dict(drop_path_rate=0.2),
         num_classes=num_classes,
         url='', )
@@ -18,7 +18,7 @@ def create_model(num_classes=1, image_size=512, architecture="tf_efficientnetv2_
     config.update({'num_classes': num_classes})
     config.update({'image_size': (image_size, image_size)})
     
-    print(config)
+    # print(config)
 
     net = EfficientDet(config, pretrained_backbone=True)
     net.class_net = HeadNet(
@@ -89,6 +89,11 @@ class EfficientDetModel(LightningModule):
         self.wbf_iou_threshold = wbf_iou_threshold
         self.inference_tfms = inference_transforms
 
+    def get_iou_thresh():
+        return self.wbf_iou_threshold
+
+    def get_architecture():
+        return self.model_architecture
 
     # @auto_move_data
     def forward(self, images, targets):
@@ -285,6 +290,9 @@ def load_model(path):
     model = EfficientDetModel(num_classes=1, img_size=512)
     return model.load_state_dict(torch.load(path))
 
+def load_ex_model(model, path):
+    return model.load_state_dict(torch.load(path))
+
 def save_preds(path,ds):
     """
     Lee todas las imágenes, obtiene
@@ -307,3 +315,17 @@ def save_preds(path,ds):
         draw_pascal_voc_bboxes(ax2, bboxes_reales[i])
         plt.savefig(path+Path(imgs[i].filename).name)
         plt.close('all')
+
+def save_pred(model, ds, i):
+    img, box, _, _ = ds.get_image_and_labels_by_idx(i)
+    pred, _ ,_ = model.predict(img)
+    plt.figure()
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(30,30))
+    ax1.imshow(imgs[i])
+    ax1.set_title("Predicción")
+    ax2.imshow(imgs[i])
+    ax2.set_title("Real")
+    draw_pascal_voc_bboxes(ax1, predicted_bboxes[i])
+    draw_pascal_voc_bboxes(ax2, bboxes_reales[i])
+    plt.savefig(path+Path(imgs[i].filename).name)
+    

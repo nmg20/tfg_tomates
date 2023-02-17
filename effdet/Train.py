@@ -1,6 +1,8 @@
 from pathlib import Path
 import pandas as pd
-import model, dataset
+# import model, dataset
+from dataset import EfficientDetDataModule
+from model import EfficientDetModel
 
 dataset_path = Path("../../../tomates512/")
 train_data_path = dataset_path/"images/train/"
@@ -17,12 +19,12 @@ tomato_val_ds = dataset.TomatoDatasetAdaptor(val_data_path, df_vl)
 
 ############################
 
-dm = dataset.EfficientDetDataModule(train_dataset_adaptor=tomato_train_ds, 
+dm = EfficientDetDataModule(train_dataset_adaptor=tomato_train_ds, 
         validation_dataset_adaptor=tomato_train_ds,
         num_workers=4,
         batch_size=2)
 
-model = model.EfficientDetModel(
+model = EfficientDetModel(
     num_classes=1,
     img_size=512
     )
