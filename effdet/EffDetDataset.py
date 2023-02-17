@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
 from matplotlib import patches
 
+import torch
+
 def get_rectangle_edges_from_pascal_bbox(bbox):
     xmin_top_left, ymin_top_left, xmax_bottom_right, ymax_bottom_right = bbox
 
@@ -39,6 +41,27 @@ def draw_pascal_voc_bboxes(
         plot_ax.add_patch(rect_1)
         plot_ax.add_patch(rect_2)
 
+def get_img_drawn(image, bboxes_anot, predicted_bboxes, size=40,name="example"):
+    """
+        image = imagen del dataset a predecir/dibujar
+        bboxes_anot = anotaciones originales de la imagen en el dataset
+        predicted_bboxes = anotaciones predecidas por el modelo
+    """
+    plt.figure()
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(size,size))
+    ax1.imshow(image)
+    ax1.set_title("Imagen predecida")
+    ax2.imshow(image)
+    ax2.set_title("Imagen anotada")
+    draw_pascal_voc_bboxes(ax1, predicted_bboxes)
+    draw_pascal_voc_bboxes(ax2, bboxes_anot.tolist())
+    fig.canvas.draw()
+    image = Image.frombytes('RGB', 
+        fig.canvas.get_width_height(),fig.canvas.tostring_rgb())
+    plt.close()
+    # image.save(name+".jpg")
+    return image
+
 def show_image(
     image, bboxes=None, draw_bboxes_fn=draw_pascal_voc_bboxes, figsize=(10, 10)
 ):
@@ -51,7 +74,7 @@ def show_image(
     plt.show()
 
 from pathlib import Path
-import PIL
+from PIL import Image
 import numpy as np
 
 class TomatoDatasetAdaptor:
@@ -65,7 +88,7 @@ class TomatoDatasetAdaptor:
 
     def get_image_and_labels_by_idx(self, index):
         image_name = self.images[index]
-        image = PIL.Image.open(self.images_dir_path / image_name)
+        image = Image.open(self.images_dir_path / image_name)
         pascal_bboxes = self.annotations_df[self.annotations_df.image == image_name][
             ["xmin", "ymin", "xmax", "ymax"]
         ].values

@@ -4,7 +4,7 @@ from effdet.efficientdet import HeadNet
 from effdet.config.model_config import efficientdet_model_param_dict
 
 import timm
-import dataset
+from EffDetDataset import get_valid_transforms
 
 def create_model(num_classes=1, image_size=512, architecture="tf_efficientnetv2_l"):
     efficientdet_model_param_dict[architecture] = dict(
@@ -76,7 +76,7 @@ class EfficientDetModel(LightningModule):
         prediction_confidence_threshold=0.2,
         learning_rate=0.0002,
         wbf_iou_threshold=0.44,
-        inference_transforms=dataset.get_valid_transforms(target_img_size=512),
+        inference_transforms=get_valid_transforms(target_img_size=512),
         model_architecture='tf_efficientnetv2_l',
     ):
         super().__init__()
@@ -89,11 +89,11 @@ class EfficientDetModel(LightningModule):
         self.wbf_iou_threshold = wbf_iou_threshold
         self.inference_tfms = inference_transforms
 
-    def get_iou_thresh():
-        return self.wbf_iou_threshold
+    # def get_iou_thresh(self):
+    #     return self.wbf_iou_threshold
 
-    def get_architecture():
-        return self.model_architecture
+    # def get_architecture(self):
+    #     return self.model_architecture
 
     # @auto_move_data
     def forward(self, images, targets):
@@ -310,22 +310,24 @@ def save_preds(path,ds):
         ax1.imshow(imgs[i])
         ax1.set_title("Predicción")
         ax2.imshow(imgs[i])
-        ax2.set_title("Real")
+        ax2.set_title("Anotada")
         draw_pascal_voc_bboxes(ax1, predicted_bboxes[i])
         draw_pascal_voc_bboxes(ax2, bboxes_reales[i])
         plt.savefig(path+Path(imgs[i].filename).name)
         plt.close('all')
 
-def save_pred(model, ds, i):
+def get_pred(model, ds, i):
     img, box, _, _ = ds.get_image_and_labels_by_idx(i)
     pred, _ ,_ = model.predict(img)
     plt.figure()
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(30,30))
-    ax1.imshow(imgs[i])
+    ax1.imshow(img)
     ax1.set_title("Predicción")
-    ax2.imshow(imgs[i])
-    ax2.set_title("Real")
+    ax2.imshow(img)
+    ax2.set_title("Anotada")
     draw_pascal_voc_bboxes(ax1, predicted_bboxes[i])
     draw_pascal_voc_bboxes(ax2, bboxes_reales[i])
-    plt.savefig(path+Path(imgs[i].filename).name)
-    
+    # plt.savefig(path+Path(imgs[i].filename).name)
+    image = PIL.Image.frombytes('RGB', 
+    fig.canvas.get_width_height(),fig.canvas.tostring_rgb())
+    plt.close("all")
