@@ -22,8 +22,8 @@ def draw_pascal_voc_bboxes(
             bottom_left,
             width,
             height,
-            linewidth=4,
-            edgecolor="black",
+            linewidth=1,
+            edgecolor="yellow",
             fill=False,
         )
         rect_2 = patches.Rectangle(
@@ -31,7 +31,7 @@ def draw_pascal_voc_bboxes(
             width,
             height,
             linewidth=2,
-            edgecolor="white",
+            edgecolor="orange",
             fill=False,
         )
 

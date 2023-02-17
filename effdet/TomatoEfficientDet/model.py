@@ -27,9 +27,6 @@ def create_model(num_classes=1, image_size=512, architecture="tf_efficientnetv2_
     )
     return DetBenchTrain(net, config)
 
-def load_model(path):
-    return EfficientDetModel.load_from_checkpoint(path)
-
 from numbers import Number
 from typing import List
 from functools import singledispatch
@@ -93,7 +90,7 @@ class EfficientDetModel(LightningModule):
         self.inference_tfms = inference_transforms
 
 
-    @auto_move_data
+    # @auto_move_data
     def forward(self, images, targets):
         return self.model(images, targets)
 
@@ -280,3 +277,33 @@ class EfficientDetModel(LightningModule):
                 scaled_bboxes.append(bboxes)
 
         return scaled_bboxes
+
+def load_checkpoint(path):
+    return EfficientDetModel.load_from_checkpoint(path)
+
+def load_model(path):
+    model = EfficientDetModel(num_classes=1, img_size=512)
+    return model.load_state_dict(torch.load(path))
+
+def save_preds(path,ds):
+    """
+    Lee todas las imágenes, obtiene
+    """
+    model.eval()
+    imgs, bboxes_reales = [],[]
+    for i in range(len(ds.images)//2):
+        img,bbox,_,_ = ds.get_image_and_labels_by_idx(i)
+        imgs.append(img)
+        bboxes_reales.append(bbox)
+    predicted_bboxes, _, _ = model.predict(imgs)
+    for i in range(len(imgs)//2):
+        plt.figure()
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(30,30))
+        ax1.imshow(imgs[i])
+        ax1.set_title("Predicción")
+        ax2.imshow(imgs[i])
+        ax2.set_title("Real")
+        draw_pascal_voc_bboxes(ax1, predicted_bboxes[i])
+        draw_pascal_voc_bboxes(ax2, bboxes_reales[i])
+        plt.savefig(path+Path(imgs[i].filename).name)
+        plt.close('all')
