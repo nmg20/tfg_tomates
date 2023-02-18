@@ -4,7 +4,11 @@ from effdet.efficientdet import HeadNet
 from effdet.config.model_config import efficientdet_model_param_dict
 
 import timm
-from EffDetDataset import get_valid_transforms
+from EffDetDataset import get_valid_transforms, draw_pascal_voc_bboxes, get_img_drawn
+from EffDetDataset import EfficientDetDataModule
+# import EffDetDataset
+
+import matplotlib.pyplot as plt
 
 def create_model(num_classes=1, image_size=512, architecture="tf_efficientnetv2_l"):
     efficientdet_model_param_dict[architecture] = dict(
@@ -33,6 +37,7 @@ from functools import singledispatch
 
 import numpy as np
 import torch
+from PIL import Image
 
 from fastcore.dispatch import typedispatch
 from pytorch_lightning import LightningModule
@@ -291,7 +296,7 @@ def load_model(path):
     return model.load_state_dict(torch.load(path))
 
 def load_ex_model(model, path):
-    return model.load_state_dict(torch.load(path))
+    model.load_state_dict(torch.load(path))
 
 def save_preds(path,ds):
     """
@@ -316,18 +321,36 @@ def save_preds(path,ds):
         plt.savefig(path+Path(imgs[i].filename).name)
         plt.close('all')
 
+def get_imgs_anots_preds(model,ds,i,j):
+    imgs,anots = [],[]
+    for k in list(range(i,j)):
+        img, anot,_,_ = ds.get_image_and_labels_by_idx(k)
+        imgs.append(img)
+        anots.append(anot)
+    pred, _, _ = model.predict(imgs)
+    return imgs,anots,pred
+
+def get_preds(model,ds,i,j):
+    imgs, anots, preds = get_imgs_anots_preds(model,ds,i,j)
+    pred_imgs = []
+    for k in list(range(len(imgs))):
+        pred_imgs.append(get_img_drawn(imgs[k],anots[k],preds[k]))
+    return pred_imgs
+
 def get_pred(model, ds, i):
     img, box, _, _ = ds.get_image_and_labels_by_idx(i)
-    pred, _ ,_ = model.predict(img)
+    pred, _ ,_ = model.predict([img])
     plt.figure()
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(30,30))
     ax1.imshow(img)
     ax1.set_title("Predicción")
     ax2.imshow(img)
     ax2.set_title("Anotada")
-    draw_pascal_voc_bboxes(ax1, predicted_bboxes[i])
-    draw_pascal_voc_bboxes(ax2, bboxes_reales[i])
+    draw_pascal_voc_bboxes(ax1, pred[i])
+    draw_pascal_voc_bboxes(ax2, box.tolist())
     # plt.savefig(path+Path(imgs[i].filename).name)
-    image = PIL.Image.frombytes('RGB', 
+    fig.canvas.draw()
+    image = Image.frombytes('RGB', 
     fig.canvas.get_width_height(),fig.canvas.tostring_rgb())
     plt.close("all")
+    return image

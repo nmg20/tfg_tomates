@@ -41,7 +41,7 @@ def draw_pascal_voc_bboxes(
         plot_ax.add_patch(rect_1)
         plot_ax.add_patch(rect_2)
 
-def get_img_drawn(image, bboxes_anot, predicted_bboxes, size=40,name="example"):
+def get_img_drawn(image, bboxes_anot, predicted_bboxes, size=40):
     """
         image = imagen del dataset a predecir/dibujar
         bboxes_anot = anotaciones originales de la imagen en el dataset
