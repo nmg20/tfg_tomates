@@ -4,10 +4,10 @@ from effdet.efficientdet import HeadNet
 from effdet.config.model_config import efficientdet_model_param_dict
 
 import timm
-from EffDetDataset import get_valid_transforms, draw_pascal_voc_bboxes, get_img_drawn
-from EffDetDataset import EfficientDetDataModule
+from EffDetDataset import *
+from EffDetDataset import *
 # import EffDetDataset
-
+import torchmetrics
 import matplotlib.pyplot as plt
 
 def create_model(num_classes=1, image_size=512, architecture="tf_efficientnetv2_l"):
@@ -35,6 +35,7 @@ from numbers import Number
 from typing import List
 from functools import singledispatch
 
+import logging
 import numpy as np
 import torch
 from PIL import Image
@@ -43,9 +44,7 @@ from fastcore.dispatch import typedispatch
 from pytorch_lightning import LightningModule
 from pytorch_lightning.core.decorators import auto_move_data
 
-
 from ensemble_boxes import ensemble_boxes_wbf
-
 
 def run_wbf(predictions, image_size=512, iou_thr=0.44, skip_box_thr=0.43, weights=None):
     bboxes = []
@@ -147,6 +146,10 @@ class EfficientDetModel(LightningModule):
             "class_loss": outputs["class_loss"].detach(),
             "box_loss": outputs["box_loss"].detach(),
         }
+
+        # accuracy = torchmetrics.Accuracy()
+        # acc = accuracy(detection,targets)
+        # self.log('Accuracy', acc,on_epoch=True)
 
         self.log("valid_loss", outputs["loss"], on_step=True, on_epoch=True, prog_bar=True,
                  logger=True, sync_dist=True)
@@ -288,6 +291,72 @@ class EfficientDetModel(LightningModule):
 
         return scaled_bboxes
 
+from fastcore.basics import patch
+
+@patch
+def aggregate_prediction_outputs(self: EfficientDetModel, outputs):
+
+    detections = torch.cat(
+        [output["batch_predictions"]["predictions"] for output in outputs]
+    )
+
+    image_ids = []
+    targets = []
+    for output in outputs:
+        batch_predictions = output["batch_predictions"]
+        image_ids.extend(batch_predictions["image_ids"])
+        targets.extend(batch_predictions["targets"])
+
+    (
+        predicted_bboxes,
+        predicted_class_confidences,
+        predicted_class_labels,
+    ) = self.post_process_detections(detections)
+
+    return (
+        predicted_class_labels,
+        image_ids,
+        predicted_bboxes,
+        predicted_class_confidences,
+        targets,
+    )
+
+from objdetecteval.metrics.coco_metrics import get_coco_stats
+
+@patch
+def validation_epoch_end(self: EfficientDetModel, outputs):
+    """Compute and log training loss and accuracy at the epoch level."""
+
+    validation_loss_mean = torch.stack(
+        [output["loss"] for output in outputs]
+    ).mean()
+
+    (
+        predicted_class_labels,
+        image_ids,
+        predicted_bboxes,
+        predicted_class_confidences,
+        targets,
+    ) = self.aggregate_prediction_outputs(outputs)
+
+    truth_image_ids = [target["image_id"].detach().item() for target in targets]
+    truth_boxes = [
+        target["bboxes"].detach()[:, [1, 0, 3, 2]].tolist() for target in targets
+    ] # convert to xyxy for evaluation
+    truth_labels = [target["labels"].detach().tolist() for target in targets]
+
+    stats = get_coco_stats(
+        prediction_image_ids=image_ids,
+        predicted_class_confidences=predicted_class_confidences,
+        predicted_bboxes=predicted_bboxes,
+        predicted_class_labels=predicted_class_labels,
+        target_image_ids=truth_image_ids,
+        target_bboxes=truth_boxes,
+        target_class_labels=truth_labels,
+    )['All']
+
+    return {"val_loss": validation_loss_mean, "metrics": stats}
+
 def load_checkpoint(path):
     return EfficientDetModel.load_from_checkpoint(path)
 
@@ -297,29 +366,6 @@ def load_model(path):
 
 def load_ex_model(model, path):
     model.load_state_dict(torch.load(path))
-
-def save_preds(path,ds):
-    """
-    Lee todas las imágenes, obtiene
-    """
-    model.eval()
-    imgs, bboxes_reales = [],[]
-    for i in range(len(ds.images)//2):
-        img,bbox,_,_ = ds.get_image_and_labels_by_idx(i)
-        imgs.append(img)
-        bboxes_reales.append(bbox)
-    predicted_bboxes, _, _ = model.predict(imgs)
-    for i in range(len(imgs)//2):
-        plt.figure()
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(30,30))
-        ax1.imshow(imgs[i])
-        ax1.set_title("Predicción")
-        ax2.imshow(imgs[i])
-        ax2.set_title("Anotada")
-        draw_pascal_voc_bboxes(ax1, predicted_bboxes[i])
-        draw_pascal_voc_bboxes(ax2, bboxes_reales[i])
-        plt.savefig(path+Path(imgs[i].filename).name)
-        plt.close('all')
 
 def get_imgs_anots_preds(model,ds,i,j):
     imgs,anots = [],[]
@@ -346,7 +392,7 @@ def get_pred(model, ds, i):
     ax1.set_title("Predicción")
     ax2.imshow(img)
     ax2.set_title("Anotada")
-    draw_pascal_voc_bboxes(ax1, pred[i])
+    draw_pascal_voc_bboxes(ax1, pred[0])
     draw_pascal_voc_bboxes(ax2, box.tolist())
     # plt.savefig(path+Path(imgs[i].filename).name)
     fig.canvas.draw()
@@ -354,3 +400,4 @@ def get_pred(model, ds, i):
     fig.canvas.get_width_height(),fig.canvas.tostring_rgb())
     plt.close("all")
     return image
+
