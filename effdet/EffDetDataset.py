@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 from matplotlib import patches
-
+import numpy as np
+import cv2 as cv
 import torch
 
 def get_rectangle_edges_from_pascal_bbox(bbox):
@@ -40,6 +41,11 @@ def draw_pascal_voc_bboxes(
         # Add the patch to the Axes
         plot_ax.add_patch(rect_1)
         plot_ax.add_patch(rect_2)
+
+# def draw_rect(image, bboxes):
+#     r = np.array(image)
+#     for bbox in bboxes:
+
 
 def get_img_drawn(image, bboxes_anot, predicted_bboxes, size=40):
     """
