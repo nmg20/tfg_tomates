@@ -23,3 +23,6 @@ o sino tambien:
 
 # Posible solución: Instalar pytorch-lightning desde github
 !pip install git+https://github.com/PyTorchLightning/pytorch-lightning
+
+#Para conectarse por ssh y exponer el puerto 16006 para visualizar TensorBoard
+$ssh -L 16006:127.0.0.1:16006 cvazquez@193.144.50.111
