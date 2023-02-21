@@ -1,9 +1,13 @@
 from pathlib import Path
 import pandas as pd
 # import model, dataset
-from EffDetDataset import EfficientDetDataModule, TomatoDatasetAdaptor
-from Model import EfficientDetModel, load_ex_model, get_pred
+from EffDetDataset import *
+from Model import *
 import torch
+from torch.utils.tensorboard import SummaryWriter
+import torchvision
+
+writer = SummaryWriter('lightning_logs/tomato_exp1')
 
 dataset_path = Path("../../tomates512/")
 train_data_path = dataset_path/"images/train/"
@@ -39,7 +43,7 @@ model = EfficientDetModel(
 
 def get_model(
         arch="tf_efficientnetv2_l",
-        iou=0.44,
+        iou=0.3,
         confd=0.2):
     return EfficientDetModel(model_architecture=arch,
         wbf_iou_threshold=iou,
@@ -63,80 +67,17 @@ from pytorch_lightning import Trainer
 # trainer.fit(model,dm)
 # torch.save(model.state_dict(),f"{model_architecture}_{wbf_iou_threshold}iou_{prediction_confidence_threshold}confidence.pth")
 
-model.load_state_dict(torch.load("modelos/ed_l_025iou_015conf_5epch.pt"))
+model.load_state_dict(torch.load("modelos/ED_20ep_0.3iou_0.2cf.pt"))
 
-model.eval()
+# model.eval()
 
 loader = dm.val_dataloader()
 dl_iter = iter(loader)
-batch = next(dl_iter)
+# batch = next(dl_iter)
+images, targets, _, _ = next(dl_iter)
 device = model.device;device
-output = model.validation_step(batch=batch,batch_idx=0)
-output
+# output = model.validation_step(batch=batch,batch_idx=0)
+# output
 
-
-from fastcore.basics import patch
-
-@patch
-def aggregate_prediction_outputs(self: EfficientDetModel, outputs):
-
-    detections = torch.cat(
-        [output["batch_predictions"]["predictions"] for output in outputs]
-    )
-
-    image_ids = []
-    targets = []
-    for output in outputs:
-        batch_predictions = output["batch_predictions"]
-        image_ids.extend(batch_predictions["image_ids"])
-        targets.extend(batch_predictions["targets"])
-
-    (
-        predicted_bboxes,
-        predicted_class_confidences,
-        predicted_class_labels,
-    ) = self.post_process_detections(detections)
-
-    return (
-        predicted_class_labels,
-        image_ids,
-        predicted_bboxes,
-        predicted_class_confidences,
-        targets,
-    )
-
-from objdetecteval.metrics.coco_metrics import get_coco_stats
-
-@patch
-def validation_epoch_end(self: EfficientDetModel, outputs):
-    """Compute and log training loss and accuracy at the epoch level."""
-
-    validation_loss_mean = torch.stack(
-        [output["loss"] for output in outputs]
-    ).mean()
-
-    (
-        predicted_class_labels,
-        image_ids,
-        predicted_bboxes,
-        predicted_class_confidences,
-        targets,
-    ) = self.aggregate_prediction_outputs(outputs)
-
-    truth_image_ids = [target["image_id"].detach().item() for target in targets]
-    truth_boxes = [
-        target["bboxes"].detach()[:, [1, 0, 3, 2]].tolist() for target in targets
-    ] # convert to xyxy for evaluation
-    truth_labels = [target["labels"].detach().tolist() for target in targets]
-
-    stats = get_coco_stats(
-        prediction_image_ids=image_ids,
-        predicted_class_confidences=predicted_class_confidences,
-        predicted_bboxes=predicted_bboxes,
-        predicted_class_labels=predicted_class_labels,
-        target_image_ids=truth_image_ids,
-        target_bboxes=truth_boxes,
-        target_class_labels=truth_labels,
-    )['All']
-
-    return {"val_loss": validation_loss_mean, "metrics": stats}
+img_grid = torchvision.utils.make_grid(images)
+writer.add_image('tomato_images', img_grid)
