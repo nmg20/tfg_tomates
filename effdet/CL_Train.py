@@ -55,12 +55,14 @@ def main():
         # type=str)
     parser.add_argument('-e', '--epochs', type=int, help="Número de épocas de entrenamiento.")
     parser.add_argument('-t','--thresh',type=float, help="Umbral de wbf_iou.")
+    parser.add_argument('-sk','--skip',type=float, help="Nivel de iou mínimo en la predicción.")
     parser.add_argument('-cd','--predconfd', type=float, help="idk man.")
     # parser.add_argument('-save','--model_name', type=str, help="Nombre con el que guardar el modelo entrenado.")
     args = parser.parse_args()
     model = EfficientDetModel(
         # model_achitecture=f"tf_efficientnetv2_{args.architecture}",
         wbf_iou_threshold=args.thresh,
+        skip_box_thr=args.skip,
         prediction_confidence_threshold=args.predconfd)
     logger = TensorBoardLogger("lightning_logs/",name=f"{args.epochs}e_{args.thresh}iou_{args.predconfd}cf")
     trainer = Trainer(

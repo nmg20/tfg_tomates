@@ -80,6 +80,7 @@ class EfficientDetModel(LightningModule):
         prediction_confidence_threshold=0.2,
         learning_rate=0.0002,
         wbf_iou_threshold=0.44,
+        skip_box_thr=0.3,
         inference_transforms=get_valid_transforms(target_img_size=512),
         model_architecture='tf_efficientnetv2_l',
     ):
@@ -91,6 +92,7 @@ class EfficientDetModel(LightningModule):
         self.prediction_confidence_threshold = prediction_confidence_threshold
         self.lr = learning_rate
         self.wbf_iou_threshold = wbf_iou_threshold
+        self.skip_box_thr = skip_box_thr
         self.inference_tfms = inference_transforms
 
     # def get_iou_thresh(self):
@@ -354,7 +356,10 @@ def validation_epoch_end(self: EfficientDetModel, outputs):
         target_bboxes=truth_boxes,
         target_class_labels=truth_labels,
     )['All']
-
+    self.log("Average Precision", stats['AP_all'], on_step=False, on_epoch=True, prog_bar=False,
+                 logger=True)
+    self.log("Average Recall", stats['AR_all'], on_step=False, on_epoch=True, prog_bar=False,
+                 logger=True)
     return {"val_loss": validation_loss_mean, "metrics": stats}
 
 def load_checkpoint(path):
@@ -366,6 +371,9 @@ def load_model(path):
 
 def load_ex_model(model, path):
     model.load_state_dict(torch.load(path))
+
+def get_batch(model,ds,i):
+    img, anots, 
 
 def get_imgs_anots_preds(model,ds,i,j):
     imgs,anots = [],[]
