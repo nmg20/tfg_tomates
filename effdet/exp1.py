@@ -4,6 +4,7 @@ import pandas as pd
 from EffDetDataset import *
 from Model import *
 from Train import *
+import os
 
 dataset_path = Path("../../tomates512/")
 train_data_path = dataset_path/"images/train/"
@@ -25,14 +26,27 @@ dm = EfficientDetDataModule(train_dataset_adaptor=train_ds,
         num_workers=4,
         batch_size=2)
 
-model = get_model()
+# model = get_model()
 
-load_ex_model(model,"modelos/ED_L_10ep_025iou_015conf.pt")
-model.eval()
-imgs = get_preds(model,test_ds,0,10)
-import os
-d = "test_044iou"
-os.mkdir(d)
-name = "ED_L_10e_044iou_02conf_test_"
-for i in list(range(len(imgs))):
-    imgs[i].save(f"{d}/{name}{i}.jpg")
+# model.eval()
+
+def save_preds(tr,sk,cf,ds,i,j):
+    model = get_model(iou=tr,skip=sk,confd=cf)
+    model.eval()
+    imgs = get_preds(model,ds,i,j)
+    d = f"test_{tr}iou_{sk}sk_{cf}cf"
+    os.mkdir(d)
+    name = f"ED_20e_{tr}iou_{sk}sk_{cf}cf_test_"
+    for i in list(range(len(imgs))):
+        imgs[i].save(f"{d}/{name}{i}.jpg")
+
+
+# load_ex_model(model,"modelos/ED_20ep_0.25iou_015conf.pt")
+# model.eval()
+# imgs = get_preds(model,test_ds,0,10)
+# import os
+# d = "test_044iou"
+# os.mkdir(d)
+# name = "ED_L_10e_044iou_02conf_test_"
+# for i in list(range(len(imgs))):
+#     imgs[i].save(f"{d}/{name}{i}.jpg")
