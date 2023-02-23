@@ -9,7 +9,7 @@ from pytorch_lightning import Trainer
 
 from torch.utils.tensorboard import SummaryWriter
 
-writer = SummaryWriter('lightning_logs/tomato_exp1')
+# writer = SummaryWriter('lightning_logs/tomato_exp1')
 
 dataset_path = Path("../../tomates512/")
 train_data_path = dataset_path/"images/train/"
@@ -35,17 +35,19 @@ dm = EfficientDetDataModule(train_dataset_adaptor=train_ds,
 
 def get_model(
         iou=0.44,
+        skip=0.43,
         confd=0.2):
-    return EfficientDetModel(model_architecture=arch,
+    return EfficientDetModel(
         wbf_iou_threshold=iou,
+        skip_box_thr=skip,
         prediction_confidence_threshold=confd)
+
+model = get_model()
 
 def train_model(model=model, dm=dm,num_epochs=5):
     trainer = Trainer(
         gus=1, num_epochs=num_epochs,num_sanity_val_steps=1)
     trainer.fit(model,dm)
-
-model = get_model()
 
 ########################################
 # Entrenamiento

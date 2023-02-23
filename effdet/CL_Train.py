@@ -64,12 +64,12 @@ def main():
         wbf_iou_threshold=args.thresh,
         skip_box_thr=args.skip,
         prediction_confidence_threshold=args.predconfd)
-    logger = TensorBoardLogger("lightning_logs/",name=f"{args.epochs}e_{args.thresh}iou_{args.predconfd}cf")
+    logger = TensorBoardLogger("lightning_logs/",name=f"{args.epochs}e_{args.thresh}iou_{args.skip}sk_{args.predconfd}cf")
     trainer = Trainer(
         gpus = 1, max_epochs=args.epochs, num_sanity_val_steps=1, logger=logger,
     )
     trainer.fit(model,dm)
-    model_name = f"{models_dir}ED_{args.epochs}ep_{args.thresh}iou_0.2cf.pt"
+    model_name = f"{models_dir}ED_{args.epochs}ep_{args.thresh}iou_{args.skip}sk_{args.predconfd}cf.pt"
     torch.save(model.state_dict(),model_name)
 
 
