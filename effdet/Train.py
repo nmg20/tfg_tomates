@@ -12,17 +12,13 @@ from torch.utils.tensorboard import SummaryWriter
 # writer = SummaryWriter('lightning_logs/tomato_exp1')
 
 dataset_path = Path("../../tomates512/")
-train_data_path = dataset_path/"images/train/"
-test_data_path = dataset_path/"images/test/"
-val_data_path = dataset_path/"images/val/"
-
 df_tr = pd.read_csv(dataset_path/"annotations/labelstrain.csv")
 df_ts = pd.read_csv(dataset_path/"annotations/labelstest.csv")
 df_vl = pd.read_csv(dataset_path/"annotations/labelsval.csv")
 
-train_ds = TomatoDatasetAdaptor(train_data_path, df_tr)
-test_ds = TomatoDatasetAdaptor(test_data_path, df_ts)
-val_ds = TomatoDatasetAdaptor(val_data_path, df_vl)
+train_ds = TomatoDatasetAdaptor(dataset_path/"images/train/", df_tr)
+test_ds = TomatoDatasetAdaptor(dataset_path/"images/test/", df_ts)
+val_ds = TomatoDatasetAdaptor(dataset_path/"images/val/", df_vl)
 
 ############################
 
@@ -33,14 +29,17 @@ dm = EfficientDetDataModule(train_dataset_adaptor=train_ds,
 
 ############################
 
-def get_model(
-        iou=0.44,
-        skip=0.43,
-        confd=0.2):
-    return EfficientDetModel(
-        wbf_iou_threshold=iou,
-        skip_box_thr=skip,
-        prediction_confidence_threshold=confd)
+# def get_model(
+#         iou=0.44,
+#         skip=0.43,
+#         confd=0.2):
+#     return EfficientDetModel(
+#         wbf_iou_threshold=iou,
+#         skip_box_thr=skip,
+#         prediction_confidence_threshold=confd)
+
+def get_model():
+    return EfficientDetModel()
 
 model = get_model()
 
@@ -62,7 +61,7 @@ def train_model(model=model, dm=dm,num_epochs=5):
 # torch.save(model.state_dict(),f"{model_architecture}_{wbf_iou_threshold}iou_{prediction_confidence_threshold}confidence.pth")
 
 # model.load_state_dict(torch.load("modelos/ED_20ep_0.3iou_0.2cf.pt"))
-model.load_state_dict(torch.load("modelos/ED_20ep_0.25iou_0.2cf.pt"))
+model.load_state_dict(torch.load("modelos/ED_20ep_0.44iou_0.2cf.pt"))
 
 # model.eval()
 
