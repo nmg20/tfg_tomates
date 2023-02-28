@@ -40,6 +40,9 @@ import numpy as np
 import torch
 from PIL import Image
 
+from torchvision.ops import box_iou
+from sklearn.metrics import average_precision_score
+
 from fastcore.dispatch import typedispatch
 from pytorch_lightning import LightningModule
 from pytorch_lightning.core.decorators import auto_move_data
@@ -80,7 +83,6 @@ class EfficientDetModel(LightningModule):
         prediction_confidence_threshold=0.2,
         learning_rate=0.0002,
         wbf_iou_threshold=0.44,
-        skip_box_thr=0.3,
         inference_transforms=get_valid_transforms(target_img_size=512),
         model_architecture='tf_efficientnetv2_l',
     ):
@@ -92,7 +94,6 @@ class EfficientDetModel(LightningModule):
         self.prediction_confidence_threshold = prediction_confidence_threshold
         self.lr = learning_rate
         self.wbf_iou_threshold = wbf_iou_threshold
-        self.skip_box_thr = skip_box_thr
         self.inference_tfms = inference_transforms
 
     # def get_iou_thresh(self):
@@ -101,7 +102,7 @@ class EfficientDetModel(LightningModule):
     # def get_architecture(self):
     #     return self.model_architecture
 
-    # @auto_move_data
+    @auto_move_data
     def forward(self, images, targets):
         return self.model(images, targets)
 
@@ -148,10 +149,6 @@ class EfficientDetModel(LightningModule):
             "class_loss": outputs["class_loss"].detach(),
             "box_loss": outputs["box_loss"].detach(),
         }
-
-        # accuracy = torchmetrics.Accuracy()
-        # acc = accuracy(detection,targets)
-        # self.log('Accuracy', acc,on_epoch=True)
 
         self.log("valid_loss", outputs["loss"], on_step=True, on_epoch=True, prog_bar=True,
                  logger=True, sync_dist=True)
@@ -356,10 +353,10 @@ def validation_epoch_end(self: EfficientDetModel, outputs):
         target_bboxes=truth_boxes,
         target_class_labels=truth_labels,
     )['All']
-    self.log("Average Precision", stats['AP_all'], on_step=False, on_epoch=True, prog_bar=False,
+    for k in stats.keys():
+        self.log(k,stats[k], on_step=False, on_epoch=True, prog_bar=False,
                  logger=True)
-    self.log("Average Recall", stats['AR_all'], on_step=False, on_epoch=True, prog_bar=False,
-                 logger=True)
+
     return {"val_loss": validation_loss_mean, "metrics": stats}
 
 def load_checkpoint(path):
