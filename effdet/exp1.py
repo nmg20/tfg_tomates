@@ -5,48 +5,58 @@ from EffDetDataset import *
 from Model import *
 from Train import *
 import os
+import argparse
 
 dataset_path = Path("../../tomates512/")
-train_data_path = dataset_path/"images/train/"
-test_data_path = dataset_path/"images/test/"
-val_data_path = dataset_path/"images/val/"
-
 df_tr = pd.read_csv(dataset_path/"annotations/labelstrain.csv")
 df_ts = pd.read_csv(dataset_path/"annotations/labelstest.csv")
 df_vl = pd.read_csv(dataset_path/"annotations/labelsval.csv")
 
-train_ds = TomatoDatasetAdaptor(train_data_path, df_tr)
-test_ds = TomatoDatasetAdaptor(test_data_path, df_ts)
-val_ds = TomatoDatasetAdaptor(val_data_path, df_vl)
+train_ds = TomatoDatasetAdaptor(dataset_path/"images/train/", df_tr)
+test_ds = TomatoDatasetAdaptor(dataset_path/"images/test/", df_ts)
+val_ds = TomatoDatasetAdaptor(dataset_path/"images/val/", df_vl)
 
 ############################
 
-dm = EfficientDetDataModule(train_dataset_adaptor=train_ds, 
-        validation_dataset_adaptor=val_ds,
-        num_workers=4,
-        batch_size=2)
+def validate_file(f):
+    if not os.path.exists(f):
+        # Argparse uses the ArgumentTypeError to give a rejection message like:
+        # error: argument input: x does not exist
+        raise argparse.ArgumentTypeError("{0} does not exist".format(f))
+    return f
 
-# model = get_model()
+def dir_path(path):
+    if os.path.isdir(path):
+        return path
+    else:
+        raise argparse.ArgumentTypeError(f"readable_dir:{path} is not a valid path")
 
-# model.eval()
+models_dir = "modelos/"
 
-def save_preds(tr,sk,cf,ds,i,j):
-    model = get_model(iou=tr,skip=sk,confd=cf)
+############################
+
+def save_preds_m(model,e,ds,i,j,prefix):
     model.eval()
     imgs = get_preds(model,ds,i,j)
-    d = f"test_{tr}iou_{sk}sk_{cf}cf"
+    d = f"{prefix}_test_{e}epochs"
     os.mkdir(d)
-    name = f"ED_20e_{tr}iou_{sk}sk_{cf}cf_test_"
+    name = f"{prefix}ED_{e}ep_test_"
     for i in list(range(len(imgs))):
         imgs[i].save(f"{d}/{name}{i}.jpg")
 
+def main():
+    parser = argparse.ArgumentParser()
+    # parser.add_argument('-m', '--model', type=int, help="Número de épocas de entrenamiento.")
+    parser.add_argument('-e', '--eps', type=int, help="Número de épocas de entrenamiento.")
+    parser.add_argument('-p', '--prefix', type=str, help="Número de épocas de entrenamiento.")
 
-# load_ex_model(model,"modelos/ED_20ep_0.25iou_015conf.pt")
-# model.eval()
-# imgs = get_preds(model,test_ds,0,10)
-# import os
-# d = "test_044iou"
-# os.mkdir(d)
-# name = "ED_L_10e_044iou_02conf_test_"
-# for i in list(range(len(imgs))):
-#     imgs[i].save(f"{d}/{name}{i}.jpg")
+    args = parser.parse_args()
+
+    model = EfficientDetModel()
+    d = f"{models_dir}ED_{args.eps}ep.pt"
+    model.load_state_dict(torch.load(d))
+
+    save_preds_m(model,args.eps,test_ds,0,10,args.prefix)
+
+if __name__=="__main__":
+    main()
