@@ -47,7 +47,7 @@ def draw_pascal_voc_bboxes(
 #     for bbox in bboxes:
 
 
-def get_img_drawn(image, bboxes_anot, predicted_bboxes, size=40):
+def get_img_drawn(image, bboxes_anot, predicted_bboxes, size=20):
     """
         image = imagen del dataset a predecir/dibujar
         bboxes_anot = anotaciones originales de la imagen en el dataset
@@ -55,10 +55,11 @@ def get_img_drawn(image, bboxes_anot, predicted_bboxes, size=40):
     """
     plt.figure()
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(size,size))
+    # fig.suptitle(title,fontsize=size*(3/2))
     ax1.imshow(image)
-    ax1.set_title("Imagen predecida")
+    ax1.set_title("Imagen predecida",fontsize=size*(5/4))
     ax2.imshow(image)
-    ax2.set_title("Imagen anotada")
+    ax2.set_title("Imagen anotada",fontsize=size*(5/4))
     draw_pascal_voc_bboxes(ax1, predicted_bboxes)
     draw_pascal_voc_bboxes(ax2, bboxes_anot.tolist())
     fig.canvas.draw()
@@ -199,8 +200,8 @@ class EfficientDetDataModule(LightningDataModule):
                 validation_dataset_adaptor,
                 train_transforms=get_train_transforms(target_img_size=512),
                 valid_transforms=get_valid_transforms(target_img_size=512),
-                num_workers=4,
-                batch_size=8):
+                num_workers=8,
+                batch_size=4):
         
         self.train_ds = train_dataset_adaptor
         self.valid_ds = validation_dataset_adaptor
@@ -222,11 +223,10 @@ class EfficientDetDataModule(LightningDataModule):
             batch_size=self.batch_size,
             shuffle=True,
             pin_memory=True,
-            drop_last=True,
+            drop_last=False,
             num_workers=self.num_workers,
             collate_fn=self.collate_fn,
         )
-
         return train_loader
 
     def val_dataset(self) -> EfficientDetDataset:
@@ -241,11 +241,10 @@ class EfficientDetDataModule(LightningDataModule):
             batch_size=self.batch_size,
             shuffle=False,
             pin_memory=True,
-            drop_last=True,
+            drop_last=False,
             num_workers=self.num_workers,
             collate_fn=self.collate_fn,
         )
-
         return valid_loader
     
     @staticmethod
