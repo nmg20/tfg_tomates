@@ -53,23 +53,31 @@ def main():
     parser = argparse.ArgumentParser()
     # parser.add_argument('-a', '--architecture', help="Tipo de arquitectura del modelo",
         # type=str)
+    parser.add_argument('-d', '--d', type=int, help="Número de épocas de entrenamiento.")
     parser.add_argument('-e', '--epochs', type=int, help="Número de épocas de entrenamiento.")
-    parser.add_argument('-t','--thresh',type=float, help="Umbral de wbf_iou.")
-    parser.add_argument('-sk','--skip',type=float, help="Nivel de iou mínimo en la predicción.")
-    parser.add_argument('-cd','--predconfd', type=float, help="idk man.")
-    # parser.add_argument('-save','--model_name', type=str, help="Nombre con el que guardar el modelo entrenado.")
+    # parser.add_argument('-t','--thresh',type=float, help="Umbral de wbf_iou.")
+    # parser.add_argument('-sk','--skip',type=float, help="Nivel de iou mínimo en la predicción.")
+    # parser.add_argument('-cd','--predconfd', type=float, help="idk man.")
+    # parser.add_argument('-s','--save', type=int, help="Nombre con el que guardar el modelo entrenado.")
+    parser.add_argument('-n','--name', type=str, help="Nombre con el que guardar el modelo entrenado.")
     args = parser.parse_args()
-    model = EfficientDetModel(
-        # model_achitecture=f"tf_efficientnetv2_{args.architecture}",
-        wbf_iou_threshold=args.thresh,
-        skip_box_thr=args.skip,
-        prediction_confidence_threshold=args.predconfd)
-    logger = TensorBoardLogger("lightning_logs/",name=f"{args.epochs}e_{args.thresh}iou_{args.skip}sk_{args.predconfd}cf")
+    if args.d :
+        model = EfficientDetModel(
+        model_architecture="tf_efficientnetv2_b0")
+    else:
+        model = EfficientDetModel(
+            # model_architecture=f"tf_efficientnetv2_{args.architecture}",
+            # wbf_iou_threshold=args.thresh,
+            # skip_box_thr=args.skip,
+            # prediction_confidence_threshold=args.predconfd
+            )
+    logger = TensorBoardLogger("lightning_logs/",name=f"ED_{args.epochs}ep_{args.name}")
     trainer = Trainer(
         gpus = 1, max_epochs=args.epochs, num_sanity_val_steps=1, logger=logger,
     )
     trainer.fit(model,dm)
-    model_name = f"{models_dir}ED_{args.epochs}ep_{args.thresh}iou_{args.skip}sk_{args.predconfd}cf.pt"
+    # if args.save:
+    model_name = f"{models_dir}ED_{args.epochs}ep_{args.name}.pt"
     torch.save(model.state_dict(),model_name)
 
 
