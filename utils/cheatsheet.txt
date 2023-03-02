@@ -1,0 +1,54 @@
+##################
+DIV
+##################
+(divide un conjunto de anotaciones (xml) en 3 conjuntos) (deprecado)
+
+python3 div.py Annotations/ ids/
+
+##################
+T
+##################
+(Divide un conjunto de imágenes y anotaciones en 3/4 conjuntos (train, test, val y trainval))
+    -> separa las anotaciones por carpetas
+    -> separa las imagenes por carpetas
+    -> registra los ids sin extension de cada conjunto
+
+# src = ../../datasets/Tomato_300x300
+    src - Annotations
+        - JPEGImages
+# dst = ./tests/
+
+python3 t.py src dst
+
+##################
+XML 2 JSON
+##################
+voc2coco/voc2coco.py -> ya tiene el cambio a float
+t512
+    - annotations (todas)
+    - dataset_ids (separacion en train, test, val y trainval)
+    - images (todas aunque no hace falta)
+    - json (resultado)
+    - labels (solo tomato)
+
+python3 voc2coco/voc2coco.py --ann_dir t512/annotations/ --ann_ids t512/dataset_ids/train.txt --labels t512/labels.txt --output t512/json/train.json --ext xml
+
+[Los JSON para Yet-Another-Pytorch-EfficientDet deben tener solo train y val.]
+
+##################
+RESIZE DATASET PASCAL VOC
+##################
+(scratch/misc/resize_dataset_pascalvoc)
+
+pythn3 main.py -p ../../tomatoVOC/val/ --output ./output_val --new_x 512 --new_y 512
+
+##################
+XML 2 CSV
+##################
+
+En la carpeta origen los xml deben ir en sus respectivas carpetas según el conjunto al que pertenezcan y estos tres conjuntos dentro de otra carpeta "annotations"(importante que sea en minúscula).
+En la carpeta destino debe haber una carpeta test, otra train y otra val.
+
+importante: guarda los nombres de las imágenes rollo con el .jpg sabes.
+
+python3 xml2csv.py ./x/ ./x/annotations/
