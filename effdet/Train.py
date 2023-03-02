@@ -61,7 +61,7 @@ def train_model(model=model, dm=dm,num_epochs=5):
 # torch.save(model.state_dict(),f"{model_architecture}_{wbf_iou_threshold}iou_{prediction_confidence_threshold}confidence.pth")
 
 # model.load_state_dict(torch.load("modelos/ED_20ep_0.3iou_0.2cf.pt"))
-model.load_state_dict(torch.load("modelos/ED_20ep_0.44iou_0.2cf.pt"))
+# model.load_state_dict(torch.load("modelos/ED_20ep_0.44iou_0.2cf.pt"))
 
 # model.eval()
 
