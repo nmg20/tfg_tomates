@@ -369,8 +369,8 @@ def load_model(path):
 def load_ex_model(model, path):
     model.load_state_dict(torch.load(path))
 
-def get_batch(model,ds,i):
-    img, anots, 
+# def get_batch(model,ds,i):
+#     img, anots, 
 
 def get_imgs_anots_preds(model,ds,i,j):
     imgs,anots = [],[]

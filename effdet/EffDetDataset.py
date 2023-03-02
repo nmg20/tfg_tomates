@@ -26,25 +26,30 @@ def draw_pascal_voc_bboxes(
             width,
             height,
             linewidth=1,
-            edgecolor="yellow",
-            fill=False,
-        )
-        rect_2 = patches.Rectangle(
-            bottom_left,
-            width,
-            height,
-            linewidth=2,
             edgecolor="orange",
             fill=False,
         )
+        # rect_2 = patches.Rectangle(
+        #     bottom_left,
+        #     width,
+        #     height,
+        #     linewidth=2,
+        #     edgecolor="orange",
+        #     fill=False,
+        # )
 
         # Add the patch to the Axes
         plot_ax.add_patch(rect_1)
-        plot_ax.add_patch(rect_2)
+        # plot_ax.add_patch(rect_2)
 
-# def draw_rect(image, bboxes):
-#     r = np.array(image)
+# def draw_preds(
+#     plot_ax,bboxes,get_rectangle_corners_fn=get_rectangle_edges_from_pascal_bbox,
+#     color,name):
 #     for bbox in bboxes:
+#         bottom_left, width, height = get_rectangle_corners_fn(bbox)
+#         rect = patches.Rectangle(bottom_left,width,height,
+#             linewidth=1,edgecolor=color,fill=False,)
+#         plot_ax.add_patch(rect)
 
 
 def get_img_drawn(image, bboxes_anot, predicted_bboxes, size=20):
@@ -68,6 +73,20 @@ def get_img_drawn(image, bboxes_anot, predicted_bboxes, size=20):
     plt.close()
     # image.save(name+".jpg")
     return image
+
+# def draw_preds(image, anots, preds, colors, names, size=20):
+#     plt.figure()
+#     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(size,size))
+#     # fig.suptitle(title,fontsize=size*(3/2))
+#     ax1.imshow(image)
+#     ax1.set_title("Imagen predecida",fontsize=size*(5/4))
+#     ax2.imshow(image)
+#     ax2.set_title("Imagen anotada",fontsize=size*(5/4))
+#     draw_pascal_voc_bboxes(ax1, predicted_bboxes)
+#     for i in range(len(preds)):
+#         draw_pred(ax2,preds[i],colors[i],names[i])
+
+
 
 def show_image(
     image, bboxes=None, draw_bboxes_fn=draw_pascal_voc_bboxes, figsize=(10, 10)
@@ -116,11 +135,16 @@ class TomatoDatasetAdaptor:
 from torch.utils.data import Dataset
 import albumentations as A
 from albumentations.pytorch.transforms import ToTensorV2
+from albumentations.augmentations import transforms
 
 def get_train_transforms(target_img_size=512):
     return A.Compose(
         [
             A.HorizontalFlip(p=0.5),
+            # transforms.ColorJitter(brightness=0.2),
+            # transforms.ColorJitter(contrast=0.2),
+            # transforms.ColorJitter(saturation=0.3),
+            # transforms.Equalize(mode='pil',by_channels=True),
             A.Resize(height=target_img_size, width=target_img_size, p=1),
             A.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
             ToTensorV2(p=1),
@@ -135,6 +159,27 @@ def get_train_transforms(target_img_size=512):
 def get_valid_transforms(target_img_size=512):
     return A.Compose(
         [
+            # transforms.ColorJitter(brightness=0.2),
+            # transforms.ColorJitter(contrast=0.2),
+            # transforms.ColorJitter(saturation=0.3),
+            # transforms.Equalize(mode='pil',by_channels=True),
+            A.Resize(height=target_img_size, width=target_img_size, p=1),
+            A.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+            ToTensorV2(p=1),
+        ],
+        p=1.0,
+        bbox_params=A.BboxParams(
+            format="pascal_voc", min_area=0, min_visibility=0, label_fields=["labels"]
+        ),
+    )
+
+def get_test_transforms(target_img_size=512):
+    return A.Compose(
+        [
+            # transforms.ColorJitter(brightness=0.2),
+            # transforms.ColorJitter(contrast=0.2),
+            # transforms.ColorJitter(saturation=0.3),
+            # transforms.Equalize(mode='pil',by_channels=True),
             A.Resize(height=target_img_size, width=target_img_size, p=1),
             A.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
             ToTensorV2(p=1),
@@ -198,15 +243,19 @@ class EfficientDetDataModule(LightningDataModule):
     def __init__(self,
                 train_dataset_adaptor,
                 validation_dataset_adaptor,
+                test_dataset_adaptor,
                 train_transforms=get_train_transforms(target_img_size=512),
                 valid_transforms=get_valid_transforms(target_img_size=512),
+                test_transforms=get_test_transforms(target_img_size=512),
                 num_workers=8,
                 batch_size=4):
         
         self.train_ds = train_dataset_adaptor
         self.valid_ds = validation_dataset_adaptor
+        self.test_ds = test_dataset_adaptor
         self.train_tfms = train_transforms
         self.valid_tfms = valid_transforms
+        self.test_tfms = test_transforms
         self.num_workers = num_workers
         self.batch_size = batch_size
         super().__init__()
@@ -246,6 +295,24 @@ class EfficientDetDataModule(LightningDataModule):
             collate_fn=self.collate_fn,
         )
         return valid_loader
+
+    def test_dataset(self) -> EfficientDetDataset:
+        return EfficientDetDataset(
+            dataset_adaptor=self.test_ds, transforms=self.test_tfms
+        )
+
+    def test_dataloader(self) -> DataLoader:
+        test_dataset = self.test_dataset()
+        test_loader = torch.utils.data.DataLoader(
+            test_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            pin_memory=True,
+            drop_last=False,
+            num_workers=self.num_workers,
+            collate_fn=self.collate_fn,
+        )
+        return test_loader
     
     @staticmethod
     def collate_fn(batch):
@@ -267,5 +334,3 @@ class EfficientDetDataModule(LightningDataModule):
 
         return images, annotations, targets, image_ids
 
-def save_img(img, name):
-    img.save(f"{name}.jpg")
