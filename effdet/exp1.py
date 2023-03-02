@@ -32,15 +32,19 @@ def dir_path(path):
         raise argparse.ArgumentTypeError(f"readable_dir:{path} is not a valid path")
 
 models_dir = "modelos/"
+preds_dir = "preds/"
 
 ############################
 
-def save_preds_m(model,e,ds,i,j,prefix):
+def save_preds_m(model,e,ds,i,j,div):
     model.eval()
     imgs = get_preds(model,ds,i,j)
-    d = f"{prefix}_test_{e}epochs"
-    os.mkdir(d)
-    name = f"{prefix}ED_{e}ep_test_"
+    d = f"{preds_dir}{div}preds_{e}epochs"
+    name = f"{div}ED_{e}ep_test_"
+    if not os.path.exists(d):
+        os.mkdir(d)
+    else:
+        name = "alt_"+name
     for i in list(range(len(imgs))):
         imgs[i].save(f"{d}/{name}{i}.jpg")
 
@@ -48,15 +52,18 @@ def main():
     parser = argparse.ArgumentParser()
     # parser.add_argument('-m', '--model', type=int, help="Número de épocas de entrenamiento.")
     parser.add_argument('-e', '--eps', type=int, help="Número de épocas de entrenamiento.")
-    parser.add_argument('-p', '--prefix', type=str, help="Número de épocas de entrenamiento.")
-
+    # parser.add_argument('-p', '--prefix', type=str, help="Número de épocas de entrenamiento.")
+    parser.add_argument('-div','--div',type=str)
     args = parser.parse_args()
 
     model = EfficientDetModel()
-    d = f"{models_dir}ED_{args.eps}ep.pt"
+    if args.div!=0:
+        d = f"{models_dir}t{args.div}ED_{args.eps}ep.pt"
+    else:
+        d = f"{models_dir}ED_{args.eps}ep.pt"
     model.load_state_dict(torch.load(d))
 
-    save_preds_m(model,args.eps,test_ds,0,10,args.prefix)
+    save_preds_m(model,args.eps,test_ds,0,5,args.div)
 
 if __name__=="__main__":
     main()
