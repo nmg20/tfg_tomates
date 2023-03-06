@@ -37,14 +37,11 @@ def dir_path(path):
     if os.path.isdir(path):
         return path
     else:
-        # warnings.warn(f"El directorio {path} no existe, pero te lo creo al toque mi rey.",stacklevel=2)
         os.mkdir(path)
         return path
 
 def validate_file(f):
     if not os.path.exists(f):
-        # Argparse uses the ArgumentTypeError to give a rejection message like:
-        # error: argument input: x does not exist
         raise argparse.ArgumentTypeError("{0} does not exist".format(f))
         
     return f
@@ -59,7 +56,6 @@ def wr(file, list):
     with open(file, "w") as f:
         for i in list:
             f.write(i.split(".")[0]+"\n")
-            # f.write(i[0]+"\n")
 
 def split(names, div):
     """
@@ -70,18 +66,11 @@ def split(names, div):
     train = names[0:m.floor(len(names)*tr)]
     val = names[m.floor(len(names)*tr):m.floor(len(names)*(tr+ts))]
     test = names[m.floor(len(names)*(1-vl)):len(names)]
-    # trainval = train+val
-    # return (train, val, test, trainval)
     return (train, val, test)
 
 def writeImageSets(setsnames, datasets):
     for i in range(len(datasets)):
-        # if not os.path.exists(setsnames[i]):
-        #     os.mkdir(setsnames[i])
         wr(setsnames[i]+".txt", datasets[i])
-        # wr(dest+"test.txt", test)
-        # wr(dest+"val.txt", val)
-        # wr(dest+"trainval.txt", train+val)
 
 def xml_to_csv(ds_xmls):
     """
@@ -107,9 +96,6 @@ def xml_to_csv(ds_xmls):
                      ymax
                      )
             xml_list.append(value)
-    # column_name = ['filename', 'width', 'height',
-    #                'class', 'xmin', 'ymin', 'xmax', 'ymax']
-    # column_name = ['image', 'class', 'xmin', 'ymin', 'xmax', 'ymax']
     column_name = ['image', 'xmin', 'ymin', 'xmax', 'ymax']
     xml_df = pd.DataFrame(xml_list, columns=column_name)
     return xml_df
@@ -131,6 +117,28 @@ def xml_to_csv(ds_xmls):
     column_name = ['image', 'xmin', 'ymin', 'xmax', 'ymax']
     xml_df = pd.DataFrame(xml_list, columns=column_name)
     return xml_df
+
+def create_ds(path,name,div):
+    """
+    Dado un directorio(dataset original), crea otro con nombre "name" y lo
+    divide según "div".
+    """
+    imgsrc,annsrc = path+"JPEGImages/",path+"Annotations/"
+    if not os.path.exists(path+"ImageSets"):
+        os.mkdir(path+"ImageSets/")
+    setsdst = path+"ImageSets/"+name+"/"
+    anndst = setsdst+"/annotations/"
+    os.mkdir(setsdst)
+    os.mkdir(anndst)
+    names = [x.split(".")[0] for x in os.listdir(imgsrc)]
+    datasets = split(names,div)
+    setnames = ["train","val","test"]
+    writeImageSets([setsdst+x for x in setnames], datasets)
+    for i in range(len(datasets)):
+        xml_files = [annsrc+x+".xml" for x in datasets[i]]
+        xml_df = xml_to_csv(xml_files)
+        xml_df.to_csv(f'{anndst}labels{setnames[i]}.csv')
+    
 
 def main():
     parser = argparse.ArgumentParser()
