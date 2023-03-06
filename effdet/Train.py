@@ -22,10 +22,10 @@ val_ds = TomatoDatasetAdaptor(dataset_path/"images/val/", df_vl)
 
 ############################
 
-dm = EfficientDetDataModule(train_dataset_adaptor=train_ds, 
-        validation_dataset_adaptor=val_ds,
-        num_workers=4,
-        batch_size=2)
+# dm = EfficientDetDataModule(train_dataset_adaptor=train_ds, 
+#         validation_dataset_adaptor=val_ds,
+#         num_workers=4,
+#         batch_size=2)
 
 ############################
 
@@ -43,7 +43,7 @@ def get_model():
 
 model = get_model()
 
-def train_model(model=model, dm=dm,num_epochs=5):
+def train_model(model, dm,num_epochs=5):
     trainer = Trainer(
         gus=1, num_epochs=num_epochs,num_sanity_val_steps=1)
     trainer.fit(model,dm)

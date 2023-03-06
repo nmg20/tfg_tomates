@@ -3,18 +3,18 @@ import pandas as pd
 # import model, dataset
 from EffDetDataset import *
 from Model import *
-from Train import *
+# from Train import *
 import os
 import argparse
 
-dataset_path = Path("../../tomates512/")
-df_tr = pd.read_csv(dataset_path/"annotations/labelstrain.csv")
-df_ts = pd.read_csv(dataset_path/"annotations/labelstest.csv")
-df_vl = pd.read_csv(dataset_path/"annotations/labelsval.csv")
+# dataset_path = Path("../../tomates512/")
+# df_tr = pd.read_csv(dataset_path/"annotations/labelstrain.csv")
+# df_ts = pd.read_csv(dataset_path/"annotations/labelstest.csv")
+# df_vl = pd.read_csv(dataset_path/"annotations/labelsval.csv")
 
-train_ds = TomatoDatasetAdaptor(dataset_path/"images/train/", df_tr)
-test_ds = TomatoDatasetAdaptor(dataset_path/"images/test/", df_ts)
-val_ds = TomatoDatasetAdaptor(dataset_path/"images/val/", df_vl)
+# train_ds = TomatoDatasetAdaptor(dataset_path/"images/train/", df_tr)
+# test_ds = TomatoDatasetAdaptor(dataset_path/"images/test/", df_ts)
+# val_ds = TomatoDatasetAdaptor(dataset_path/"images/val/", df_vl)
 
 ############################
 
@@ -50,6 +50,7 @@ def save_preds_m(model,e,ds,i,j,div):
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument('-d','--dataset',type=dir_path, help="Directorio del dataset a partir del que crear el dataframe.")
     # parser.add_argument('-m', '--model', type=int, help="Número de épocas de entrenamiento.")
     parser.add_argument('-e', '--eps', type=int, help="Número de épocas de entrenamiento.")
     # parser.add_argument('-p', '--prefix', type=str, help="Número de épocas de entrenamiento.")
@@ -62,7 +63,7 @@ def main():
     else:
         d = f"{models_dir}ED_{args.eps}ep.pt"
     model.load_state_dict(torch.load(d))
-
+    train_ds, test_ds, val_ds = load_dss(args.dataset)
     save_preds_m(model,args.eps,test_ds,0,5,args.div)
 
 if __name__=="__main__":

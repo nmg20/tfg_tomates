@@ -38,6 +38,7 @@ from functools import singledispatch
 import logging
 import numpy as np
 import torch
+import torch.nn.functional as F
 from PIL import Image
 
 from torchvision.ops import box_iou
@@ -91,6 +92,7 @@ class EfficientDetModel(LightningModule):
         self.model = create_model(
             num_classes, img_size, architecture=model_architecture
         )
+        # self.dropout = nn.Dropout()
         self.prediction_confidence_threshold = prediction_confidence_threshold
         self.lr = learning_rate
         self.wbf_iou_threshold = wbf_iou_threshold
@@ -120,12 +122,16 @@ class EfficientDetModel(LightningModule):
             "box_loss": losses["box_loss"].detach(),
         }
 
+        # print("\n\n",losses,"\n\n")
+
+        # loss = F.cross_entropy(losses['loss'],torch.tensor(annotations))
+
         self.log("train_loss", losses["loss"], on_step=True, on_epoch=True, prog_bar=True,
                  logger=True)
-        self.log(
-            "train_class_loss", losses["class_loss"], on_step=True, on_epoch=True, prog_bar=True,
-            logger=True
-        )
+        # self.log(
+        #     "train_class_loss", losses["class_loss"], on_step=True, on_epoch=True, prog_bar=True,
+        #     logger=True
+        # )
         self.log("train_box_loss", losses["box_loss"], on_step=True, on_epoch=True, prog_bar=True,
                  logger=True)
 

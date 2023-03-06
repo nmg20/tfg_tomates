@@ -3,6 +3,10 @@ from matplotlib import patches
 import numpy as np
 import cv2 as cv
 import torch
+import pandas as pd
+from utils.dataset_to_csv import *
+
+datasets_dir = "/media/rtx3090/Disco2TB/cvazquez/nico/datasets/"
 
 def get_rectangle_edges_from_pascal_bbox(bbox):
     xmin_top_left, ymin_top_left, xmax_bottom_right, ymax_bottom_right = bbox
@@ -21,36 +25,14 @@ def draw_pascal_voc_bboxes(
     for bbox in bboxes:
         bottom_left, width, height = get_rectangle_corners_fn(bbox)
 
-        rect_1 = patches.Rectangle(
+        plot_ax.add_patch(patches.Rectangle(
             bottom_left,
             width,
             height,
             linewidth=1,
             edgecolor="orange",
             fill=False,
-        )
-        # rect_2 = patches.Rectangle(
-        #     bottom_left,
-        #     width,
-        #     height,
-        #     linewidth=2,
-        #     edgecolor="orange",
-        #     fill=False,
-        # )
-
-        # Add the patch to the Axes
-        plot_ax.add_patch(rect_1)
-        # plot_ax.add_patch(rect_2)
-
-# def draw_preds(
-#     plot_ax,bboxes,get_rectangle_corners_fn=get_rectangle_edges_from_pascal_bbox,
-#     color,name):
-#     for bbox in bboxes:
-#         bottom_left, width, height = get_rectangle_corners_fn(bbox)
-#         rect = patches.Rectangle(bottom_left,width,height,
-#             linewidth=1,edgecolor=color,fill=False,)
-#         plot_ax.add_patch(rect)
-
+        ))
 
 def get_img_drawn(image, bboxes_anot, predicted_bboxes, size=20):
     """
@@ -71,22 +53,7 @@ def get_img_drawn(image, bboxes_anot, predicted_bboxes, size=20):
     image = Image.frombytes('RGB', 
         fig.canvas.get_width_height(),fig.canvas.tostring_rgb())
     plt.close()
-    # image.save(name+".jpg")
     return image
-
-# def draw_preds(image, anots, preds, colors, names, size=20):
-#     plt.figure()
-#     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(size,size))
-#     # fig.suptitle(title,fontsize=size*(3/2))
-#     ax1.imshow(image)
-#     ax1.set_title("Imagen predecida",fontsize=size*(5/4))
-#     ax2.imshow(image)
-#     ax2.set_title("Imagen anotada",fontsize=size*(5/4))
-#     draw_pascal_voc_bboxes(ax1, predicted_bboxes)
-#     for i in range(len(preds)):
-#         draw_pred(ax2,preds[i],colors[i],names[i])
-
-
 
 def show_image(
     image, bboxes=None, draw_bboxes_fn=draw_pascal_voc_bboxes, figsize=(10, 10)
@@ -102,6 +69,9 @@ def show_image(
 from pathlib import Path
 from PIL import Image
 import numpy as np
+
+# def get_dir_imgs(path,anns):
+    
 
 class TomatoDatasetAdaptor:
     def __init__(self, images_dir_path, annotations_dataframe):
@@ -141,7 +111,7 @@ def get_train_transforms(target_img_size=512):
     return A.Compose(
         [
             A.HorizontalFlip(p=0.5),
-            # transforms.ColorJitter(brightness=0.2),
+            transforms.ColorJitter(brightness=0.2),
             # transforms.ColorJitter(contrast=0.2),
             # transforms.ColorJitter(saturation=0.3),
             # transforms.Equalize(mode='pil',by_channels=True),
@@ -334,3 +304,38 @@ class EfficientDetDataModule(LightningDataModule):
 
         return images, annotations, targets, image_ids
 
+# def create_ds(path):
+
+# def load_dss(path,name):
+#     dataset_path = Path(path)
+#     train_data_path = dataset_path/"images/train/"
+#     test_data_path = dataset_path/"images/test/"
+#     val_data_path = dataset_path/"images/val/"
+#     df_tr = pd.read_csv(dataset_path/"annotations/labelstrain.csv")
+#     df_ts = pd.read_csv(dataset_path/"annotations/labelstest.csv")
+#     df_vl = pd.read_csv(dataset_path/"annotations/labelsval.csv")
+
+#     train_ds = TomatoDatasetAdaptor(train_data_path, df_tr)
+#     test_ds = TomatoDatasetAdaptor(test_data_path, df_ts)
+#     val_ds = TomatoDatasetAdaptor(val_data_path, df_vl)
+#     return train_ds, test_ds, val_ds
+
+def load_dss(path,name):
+    dataset_path = Path(path)
+    images_path = dataset_path/"JPEGImages"
+    dfs_path = dataset_path/"ImageSets"/name
+    df_tr = pd.read_csv(dfs_path/"labelstrain.csv")
+    df_ts = pd.read_csv(dfs_path/"labelstest.csv")
+    df_vl = pd.read_csv(dfs_path/"labelsval.csv")
+
+    train_ds = TomatoDatasetAdaptor(images_path, df_tr)
+    test_ds = TomatoDatasetAdaptor(images_path, df_ts)
+    val_ds = TomatoDatasetAdaptor(images_path, df_vl)
+    return train_ds, test_ds, val_ds
+
+def get_dm(train,val,test):
+    return EfficientDetDataModule(train_dataset_adaptor=train, 
+        validation_dataset_adaptor=val,
+        test_dataset_adaptor=test,
+        num_workers=4,
+        batch_size=2)
