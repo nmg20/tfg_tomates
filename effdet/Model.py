@@ -6,7 +6,7 @@ from effdet.config.model_config import efficientdet_model_param_dict
 import timm
 from EffDetDataset import *
 # import EffDetDataset
-from torchmetrics.detection import MAP
+# from torchmetrics.detection import mean_ap as MAP
 import matplotlib.pyplot as plt
 
 def create_model(num_classes=1, image_size=512, architecture="tf_efficientnetv2_l"):
@@ -43,7 +43,7 @@ from sklearn.metrics import average_precision_score
 
 from fastcore.dispatch import typedispatch
 from pytorch_lightning import LightningModule
-from pytorch_lightning.core.decorators import auto_move_data
+# from pytorch_lightning.core.decorators import auto_move_data
 
 from ensemble_boxes import ensemble_boxes_wbf
 
@@ -94,9 +94,9 @@ class EfficientDetModel(LightningModule):
         self.lr = learning_rate
         self.wbf_iou_threshold = wbf_iou_threshold
         self.inference_tfms = inference_transforms
-        self.metric = MAP()
+        # self.metric = MAP()
 
-    @auto_move_data
+    # @auto_move_data
     def forward(self, images, targets):
         return self.model(images, targets)
 
@@ -178,20 +178,31 @@ class EfficientDetModel(LightningModule):
     #              prog_bar=True, logger=True, sync_dist=True)
 
     #     return {'loss': outputs["loss"], 'batch_predictions': batch_predictions}
+    @torch.no_grad()
     def test_step(self, batch, batch_idx):
-        """
-        pred -> lista de diccionarios. 1 dict x img predecida
-            dict => 'boxes' = preds[0]
-                    'labels' = preds[1]  -> todos FloatTensor
-                    'scores' = preds[2]
-        target -> lista de dicts. 1 dict x img.
-            dict => 'boxes' = targets['bboxes']
-                    'labels' = targets['labels']
-        """
-        images, annotations, targets, _ = batch
-        boxes, labels, scores =  model.predict(images)
-        pred = dict()
-        self.metric
+        images, annotations, targets, image_ids = batch
+        outputs = self.model(images, annotations)
+
+        detections = outputs["detections"]
+
+        batch_predictions = {
+            "predictions": detections,
+            "targets": targets,
+            "image_ids": image_ids,
+        }
+
+        logging_losses = {
+            "box_loss": outputs["box_loss"].detach(),
+        }
+
+        self.log("test_loss", outputs["loss"], on_step=True, on_epoch=True, prog_bar=True,
+                 logger=True, sync_dist=True)
+
+        self.log("test_box_loss", logging_losses["box_loss"], on_step=True, on_epoch=True,
+                 prog_bar=True, logger=True, sync_dist=True)
+
+        return {'loss': outputs["loss"], 'batch_predictions': batch_predictions}
+    
         
         
 
@@ -391,6 +402,9 @@ def validation_epoch_end(self: EfficientDetModel, outputs):
                  logger=True)
 
     return {"val_loss": validation_loss_mean, "metrics": stats}
+
+def get_model():
+    return EfficientDetModel()
 
 def load_checkpoint(path):
     return EfficientDetModel.load_from_checkpoint(path)
