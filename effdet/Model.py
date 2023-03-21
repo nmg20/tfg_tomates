@@ -157,27 +157,6 @@ class EfficientDetModel(LightningModule):
 
         return {'loss': outputs["loss"], 'batch_predictions': batch_predictions}
     
-    # Reutilizo el paso de validación
-    # @torch.no_grad()
-    # def test_step(self, batch, batch_idx):
-    #     images, annotations, targets, image_ids = batch
-    #     outputs = self.model(images, annotations)
-    #     detections = outputs["detections"]
-    #     batch_predictions = {
-    #         "predictions": detections,
-    #         "targets": targets,
-    #         "image_ids": image_ids,
-    #     }
-    #     logging_losses = {
-    #         "class_loss": outputs["class_loss"].detach(),
-    #         "box_loss": outputs["box_loss"].detach(),
-    #     }
-    #     self.log("test_loss", outputs["loss"], on_step=True, on_epoch=True, prog_bar=True,
-    #              logger=True, sync_dist=True)
-    #     self.log("test_box_loss", logging_losses["box_loss"], on_step=True, on_epoch=True,
-    #              prog_bar=True, logger=True, sync_dist=True)
-
-    #     return {'loss': outputs["loss"], 'batch_predictions': batch_predictions}
     @torch.no_grad()
     def test_step(self, batch, batch_idx):
         images, annotations, targets, image_ids = batch
@@ -202,9 +181,6 @@ class EfficientDetModel(LightningModule):
                  prog_bar=True, logger=True, sync_dist=True)
 
         return {'loss': outputs["loss"], 'batch_predictions': batch_predictions}
-    
-        
-        
 
     @typedispatch
     def predict(self, images: List):
@@ -453,49 +429,49 @@ def get_pred(model, ds, i):
     plt.close("all")
     return image
 
-def format_anots(anots,max_bbs):
-    """
-    Añade padding a los arrays de anotaciones de cada imagen para
-    poder convertir la lista a tensor.
-    anots : lista de np.arrays
-    """
-    if max_bbs==0:
-        max_bbs = len(max(anots,key=len))
-    padded = []
-    for anot in anots:
-        padded.append(np.pad(anot,[(0,(max_bbs-len(anot))),(0,0)]))
-    return padded
+# def format_anots(anots,max_bbs):
+#     """
+#     Añade padding a los arrays de anotaciones de cada imagen para
+#     poder convertir la lista a tensor.
+#     anots : lista de np.arrays
+#     """
+#     if max_bbs==0:
+#         max_bbs = len(max(anots,key=len))
+#     padded = []
+#     for anot in anots:
+#         padded.append(np.pad(anot,[(0,(max_bbs-len(anot))),(0,0)]))
+#     return padded
 
-def format_preds(preds,max_bbs):
-    preds_array = []
-    for pred in preds:
-        preds_array.append(np.array(pred))
-    return format_anots(preds_array,max_bbs)
+# def format_preds(preds,max_bbs):
+#     preds_array = []
+#     for pred in preds:
+#         preds_array.append(np.array(pred))
+#     return format_anots(preds_array,max_bbs)
 
-def format_inference(anots,preds):
-    max_bbs = len(max(anots,key=len))
-    anots_tensor = torch.tensor(format_anots(anots,0))
-    preds_tensor = torch.tensor(format_preds(preds,max_bbs))
-    return anots_tensor, preds_tensor
+# def format_inference(anots,preds):
+#     max_bbs = len(max(anots,key=len))
+#     anots_tensor = torch.tensor(format_anots(anots,0))
+#     preds_tensor = torch.tensor(format_preds(preds,max_bbs))
+#     return anots_tensor, preds_tensor
 
-def format_tensor(anots,preds):
-    max_cols = max([len(row) for batch in anots for row in batch])
-    max_rows = max([len(batch) for batch in anots])
-    padded_anots = [batch + [[0] * (max_cols)] * (max_rows - len(batch)) for batch in anots]
-    padded_preds = [batch + [[0] * (max_cols)] * (max_rows - len(batch)) for batch in preds]
-    padded_anots = torch.tensor([row + [0] * (len(target) - len(row)) for batch in padded_anots for row in batch])
-    padded_preds = torch.tensor([row + [0] * (len(target) - len(row)) for batch in padded_preds for row in batch])
-    padded_anots = padded_anots.view(-1, max_rows, max_cols)
-    padded_preds = padded_preds.view(-1, max_rows, max_cols)
-    return padded_anots, padded_preds
+# def format_tensor(anots,preds):
+#     max_cols = max([len(row) for batch in anots for row in batch])
+#     max_rows = max([len(batch) for batch in anots])
+#     padded_anots = [batch + [[0] * (max_cols)] * (max_rows - len(batch)) for batch in anots]
+#     padded_preds = [batch + [[0] * (max_cols)] * (max_rows - len(batch)) for batch in preds]
+#     padded_anots = torch.tensor([row + [0] * (len(target) - len(row)) for batch in padded_anots for row in batch])
+#     padded_preds = torch.tensor([row + [0] * (len(target) - len(row)) for batch in padded_preds for row in batch])
+#     padded_anots = padded_anots.view(-1, max_rows, max_cols)
+#     padded_preds = padded_preds.view(-1, max_rows, max_cols)
+#     return padded_anots, padded_preds
 
-def format_anots(anots):
-    max_cols = max([len(row) for batch in anots for row in batch])
-    max_rows = max([len(batch) for batch in anots])
-    padded_anots = [batch + [[0] * (max_cols)] * (max_rows - len(batch)) for batch in anots]
-    # padded_preds = [batch + [[0] * (max_cols)] * (max_rows - len(batch)) for batch in preds]
-    padded_anots = torch.tensor([row + [0] * (len(target) - len(row)) for batch in padded_anots for row in batch])
-    # padded_preds = torch.tensor([row + [0] * (len(target) - len(row)) for batch in padded_preds for row in batch])
-    padded_anots = padded_anots.view(-1, max_rows, max_cols)
-    # padded_preds = padded_preds.view(-1, max_rows, max_cols)
-    return padded_anots
+# def format_anots(anots):
+#     max_cols = max([len(row) for batch in anots for row in batch])
+#     max_rows = max([len(batch) for batch in anots])
+#     padded_anots = [batch + [[0] * (max_cols)] * (max_rows - len(batch)) for batch in anots]
+#     # padded_preds = [batch + [[0] * (max_cols)] * (max_rows - len(batch)) for batch in preds]
+#     padded_anots = torch.tensor([row + [0] * (len(target) - len(row)) for batch in padded_anots for row in batch])
+#     # padded_preds = torch.tensor([row + [0] * (len(target) - len(row)) for batch in padded_preds for row in batch])
+#     padded_anots = padded_anots.view(-1, max_rows, max_cols)
+#     # padded_preds = padded_preds.view(-1, max_rows, max_cols)
+#     return padded_anots
