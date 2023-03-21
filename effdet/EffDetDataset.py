@@ -8,6 +8,7 @@ import pandas as pd
 from utils.dataset_to_csv import *
 
 datasets_dir = "/media/rtx3090/Disco2TB/cvazquez/nico/datasets/"
+main_ds = "/media/rtx3090/Disco2TB/cvazquez/nico/datasets/Tomato_1280x720/"
 
 def get_rectangle_edges_from_pascal_bbox(bbox):
     xmin_top_left, ymin_top_left, xmax_bottom_right, ymax_bottom_right = bbox
@@ -41,7 +42,7 @@ def get_img_drawn(image, bboxes_anot, predicted_bboxes, loss, size=20):
         bboxes_anot = anotaciones originales de la imagen en el dataset
         predicted_bboxes = anotaciones predecidas por el modelo
     """
-    plt.figure()
+    # plt.figure()
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(size,size))
     # fig.suptitle(title,fontsize=size*(3/2))
     ax1.imshow(image)
@@ -50,6 +51,22 @@ def get_img_drawn(image, bboxes_anot, predicted_bboxes, loss, size=20):
     ax2.set_title("Imagen anotada",fontsize=size*(5/4))
     draw_pascal_voc_bboxes(ax1, predicted_bboxes)
     draw_pascal_voc_bboxes(ax2, bboxes_anot.tolist())
+    fig.canvas.draw()
+    image = Image.frombytes('RGB', 
+        fig.canvas.get_width_height(),fig.canvas.tostring_rgb())
+    plt.close()
+    return image
+
+def draw_img(image, bboxes):
+    # plt.figure()
+    fig, ax = plt.subplots()
+    # for bbox in bboxes:
+    #     bb = np.array(bbox,dtype=np.float32)
+    #     rect = plt.Rectangle((bb[1], bb[0]), bb[3]-bb[1], bb[2]-bb[0], color='yellow',
+    #                      fill=False, lw=3)
+    #     plt.gca().add_patch(rect)
+    ax.imshow(image)
+    draw_pascal_voc_bboxes(ax,bboxes)
     fig.canvas.draw()
     image = Image.frombytes('RGB', 
         fig.canvas.get_width_height(),fig.canvas.tostring_rgb())
@@ -343,4 +360,8 @@ def get_dm(train,val,test):
 
 def get_dm_standalone(path,name):
     train, test, val = load_dss(path,name)
+    return get_dm(train,val,test)
+
+def get_dm2(name):
+    train,test,val=load_dss(main_ds,name)
     return get_dm(train,val,test)
