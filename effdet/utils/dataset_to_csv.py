@@ -127,9 +127,9 @@ def create_ds(path,name,div):
     if not os.path.exists(path+"ImageSets"):
         os.mkdir(path+"ImageSets/")
     setsdst = path+"ImageSets/"+name+"/"
-    anndst = setsdst+"/annotations/"
+    # anndst = setsdst+"/annotations/"
     os.mkdir(setsdst)
-    os.mkdir(anndst)
+    # os.mkdir(anndst)
     names = [x.split(".")[0] for x in os.listdir(imgsrc)]
     datasets = split(names,div)
     setnames = ["train","val","test"]
@@ -137,47 +137,23 @@ def create_ds(path,name,div):
     for i in range(len(datasets)):
         xml_files = [annsrc+x+".xml" for x in datasets[i]]
         xml_df = xml_to_csv(xml_files)
-        xml_df.to_csv(f'{anndst}labels{setnames[i]}.csv')
+        xml_df.to_csv(f'{setsdst}labels{setnames[i]}.csv')
     
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('source_dir',help="carpeta con la imágenes a procesar.", 
         type = dir_path)
-    parser.add_argument('target_dir',help="carpeta en la que volcar el procesado.", 
+    parser.add_argument('-n','--name',help="carpeta en la que volcar el procesado.", 
         type = dir_path)
     parser.add_argument('-d','--div',type=str)
-    # parser.add_argument('test', help="flag que indica si se establece un conjunto de test.")
     args = parser.parse_args()
-    # src = ../../datasets/Tomato_300x300
-    # dst = ./tests/
-    src = args.source_dir
-    dest = args.target_dir
-        
-    imgsrc = src+"JPEGImages/"
-    # imgdst = dest+"images/"
-    annsrc = src+"Annotations/"
-    anndst = dest+"annotations/"
-    setsdst = dest+"imagesets/"
-    if not os.path.exists(anndst):
-        os.mkdir(anndst)
-    if not os.path.exists(setsdst):
-        os.mkdir(setsdst)
 
     if args.div=="0":
-        div = [0.5,0.2,0.3]
+        div = [0.6,0.2,0.2] # División por defecto
     else:
         div = [(float(x)/100) for x in re.findall("..",args.div)]
-    # Obtenemos sólo el nombre de cada imagen sin el .jpg
-    names = [x.split(".")[0] for x in os.listdir(imgsrc)]
-    # train, val, test, trainval = split(names,div)
-    datasets = split(names,div)
-    setnames = ["train","val","test"]
-    writeImageSets([setsdst+x for x in setnames], datasets)
-    for i in range(len(datasets)):
-        xml_files = [annsrc+x+".xml" for x in datasets[i]]
-        xml_df = xml_to_csv(xml_files)
-        xml_df.to_csv(f'{anndst}labels{setnames[i]}.csv')
+    create_ds(args.source_dir,args.name,div)
 
 
 if __name__=='__main__':
