@@ -47,13 +47,19 @@ def save_preds_m(model,e,ds,i,j,div):
         imgs[i].save(f"{d}/{name}{i}.jpg")
 
 def main():
+    """
+    Leer dataset principal del .config.
+    Sacar el que tenga name==name.
+    Leer model de modelos
+    """
+
     parser = argparse.ArgumentParser()
-    parser.add_argument('-d','--dataset',type=dir_path, help="Directorio del dataset a partir del que crear el dataframe.")
+    # parser.add_argument('-d','--dataset',type=dir_path, help="Directorio del dataset a partir del que crear el dataframe.")
     parser.add_argument('-n','--name',type=str, help="Directorio del dataset a partir del que crear el dataframe.")
     parser.add_argument('-m', '--model', type=validate_file, help="Número de épocas de entrenamiento.")
-    parser.add_argument('-e', '--eps', type=int, help="Número de épocas de entrenamiento.")
+    # parser.add_argument('-e', '--eps', type=int, help="Número de épocas de entrenamiento.")
     #parser.add_argument('-p', '--prefix', type=str, help="Número de épocas de entrenamiento.")
-    parser.add_argument('-div','--div',type=str)
+    # parser.add_argument('-div','--div',type=str)
     args = parser.parse_args()
 
     model = EfficientDetModel()
