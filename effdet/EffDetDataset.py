@@ -35,7 +35,7 @@ def draw_pascal_voc_bboxes(
             fill=False,
         ))
 
-def get_img_drawn(image, bboxes_anot, predicted_bboxes, size=20):
+def get_img_drawn(image, bboxes_anot, predicted_bboxes, loss, size=20):
     """
         image = imagen del dataset a predecir/dibujar
         bboxes_anot = anotaciones originales de la imagen en el dataset
@@ -45,7 +45,7 @@ def get_img_drawn(image, bboxes_anot, predicted_bboxes, size=20):
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(size,size))
     # fig.suptitle(title,fontsize=size*(3/2))
     ax1.imshow(image)
-    ax1.set_title("Imagen predecida",fontsize=size*(5/4))
+    ax1.set_title(f"Imagen predecida\nLoss={loss}",fontsize=size*(5/4))
     ax2.imshow(image)
     ax2.set_title("Imagen anotada",fontsize=size*(5/4))
     draw_pascal_voc_bboxes(ax1, predicted_bboxes)
