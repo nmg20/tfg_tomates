@@ -30,7 +30,7 @@ def main():
     parser.add_argument('-e', '--epochs', type=int, help="Número de épocas de entrenamiento.")
     parser.add_argument('-n','--name',type=str)
     args = parser.parse_args()
-    dm = get_dm(args.dataset)
+    dm = get_dm_standalone(args.dataset,args.name)
     model = EfficientDetModel()
     model_name = f"ED_{args.epochs}ep"
     if args.name!="no":

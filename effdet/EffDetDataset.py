@@ -3,6 +3,7 @@ from matplotlib import patches
 import numpy as np
 import cv2 as cv
 import torch
+torch.manual_seed(17)
 import pandas as pd
 from utils.dataset_to_csv import *
 
@@ -339,3 +340,7 @@ def get_dm(train,val,test):
         test_dataset_adaptor=test,
         num_workers=4,
         batch_size=2)
+
+def get_dm_standalone(path,name):
+    train, test, val = load_dss(path,name)
+    return get_dm(train,val,test)

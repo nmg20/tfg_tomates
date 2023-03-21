@@ -5,9 +5,8 @@ from effdet.config.model_config import efficientdet_model_param_dict
 
 import timm
 from EffDetDataset import *
-from EffDetDataset import *
 # import EffDetDataset
-import torchmetrics
+from torchmetrics.detection import MAP
 import matplotlib.pyplot as plt
 
 def create_model(num_classes=1, image_size=512, architecture="tf_efficientnetv2_l"):
@@ -22,8 +21,6 @@ def create_model(num_classes=1, image_size=512, architecture="tf_efficientnetv2_
     config.update({'num_classes': num_classes})
     config.update({'image_size': (image_size, image_size)})
     
-    # print(config)
-
     net = EfficientDet(config, pretrained_backbone=True)
     net.class_net = HeadNet(
         config,
@@ -97,12 +94,7 @@ class EfficientDetModel(LightningModule):
         self.lr = learning_rate
         self.wbf_iou_threshold = wbf_iou_threshold
         self.inference_tfms = inference_transforms
-
-    # def get_iou_thresh(self):
-    #     return self.wbf_iou_threshold
-
-    # def get_architecture(self):
-    #     return self.model_architecture
+        self.metric = MAP()
 
     @auto_move_data
     def forward(self, images, targets):
@@ -110,7 +102,6 @@ class EfficientDetModel(LightningModule):
 
     def configure_optimizers(self):
         return torch.optim.AdamW(self.model.parameters(), lr=self.lr)
-
 
     def training_step(self, batch, batch_idx):
         images, annotations, _, image_ids = batch
@@ -137,7 +128,6 @@ class EfficientDetModel(LightningModule):
 
         return losses['loss']
 
-
     @torch.no_grad()
     def validation_step(self, batch, batch_idx):
         images, annotations, targets, image_ids = batch
@@ -158,16 +148,53 @@ class EfficientDetModel(LightningModule):
 
         self.log("valid_loss", outputs["loss"], on_step=True, on_epoch=True, prog_bar=True,
                  logger=True, sync_dist=True)
-        self.log(
-            "valid_class_loss", logging_losses["class_loss"], on_step=True, on_epoch=True,
-            prog_bar=True, logger=True, sync_dist=True
-        )
+        # self.log(
+        #     "valid_class_loss", logging_losses["class_loss"], on_step=True, on_epoch=True,
+        #     prog_bar=True, logger=True, sync_dist=True
+        # )
         self.log("valid_box_loss", logging_losses["box_loss"], on_step=True, on_epoch=True,
                  prog_bar=True, logger=True, sync_dist=True)
 
         return {'loss': outputs["loss"], 'batch_predictions': batch_predictions}
     
-    
+    # Reutilizo el paso de validación
+    # @torch.no_grad()
+    # def test_step(self, batch, batch_idx):
+    #     images, annotations, targets, image_ids = batch
+    #     outputs = self.model(images, annotations)
+    #     detections = outputs["detections"]
+    #     batch_predictions = {
+    #         "predictions": detections,
+    #         "targets": targets,
+    #         "image_ids": image_ids,
+    #     }
+    #     logging_losses = {
+    #         "class_loss": outputs["class_loss"].detach(),
+    #         "box_loss": outputs["box_loss"].detach(),
+    #     }
+    #     self.log("test_loss", outputs["loss"], on_step=True, on_epoch=True, prog_bar=True,
+    #              logger=True, sync_dist=True)
+    #     self.log("test_box_loss", logging_losses["box_loss"], on_step=True, on_epoch=True,
+    #              prog_bar=True, logger=True, sync_dist=True)
+
+    #     return {'loss': outputs["loss"], 'batch_predictions': batch_predictions}
+    def test_step(self, batch, batch_idx):
+        """
+        pred -> lista de diccionarios. 1 dict x img predecida
+            dict => 'boxes' = preds[0]
+                    'labels' = preds[1]  -> todos FloatTensor
+                    'scores' = preds[2]
+        target -> lista de dicts. 1 dict x img.
+            dict => 'boxes' = targets['bboxes']
+                    'labels' = targets['labels']
+        """
+        images, annotations, targets, _ = batch
+        boxes, labels, scores =  model.predict(images)
+        pred = dict()
+        self.metric
+        
+        
+
     @typedispatch
     def predict(self, images: List):
         """
@@ -412,3 +439,49 @@ def get_pred(model, ds, i):
     plt.close("all")
     return image
 
+def format_anots(anots,max_bbs):
+    """
+    Añade padding a los arrays de anotaciones de cada imagen para
+    poder convertir la lista a tensor.
+    anots : lista de np.arrays
+    """
+    if max_bbs==0:
+        max_bbs = len(max(anots,key=len))
+    padded = []
+    for anot in anots:
+        padded.append(np.pad(anot,[(0,(max_bbs-len(anot))),(0,0)]))
+    return padded
+
+def format_preds(preds,max_bbs):
+    preds_array = []
+    for pred in preds:
+        preds_array.append(np.array(pred))
+    return format_anots(preds_array,max_bbs)
+
+def format_inference(anots,preds):
+    max_bbs = len(max(anots,key=len))
+    anots_tensor = torch.tensor(format_anots(anots,0))
+    preds_tensor = torch.tensor(format_preds(preds,max_bbs))
+    return anots_tensor, preds_tensor
+
+def format_tensor(anots,preds):
+    max_cols = max([len(row) for batch in anots for row in batch])
+    max_rows = max([len(batch) for batch in anots])
+    padded_anots = [batch + [[0] * (max_cols)] * (max_rows - len(batch)) for batch in anots]
+    padded_preds = [batch + [[0] * (max_cols)] * (max_rows - len(batch)) for batch in preds]
+    padded_anots = torch.tensor([row + [0] * (len(target) - len(row)) for batch in padded_anots for row in batch])
+    padded_preds = torch.tensor([row + [0] * (len(target) - len(row)) for batch in padded_preds for row in batch])
+    padded_anots = padded_anots.view(-1, max_rows, max_cols)
+    padded_preds = padded_preds.view(-1, max_rows, max_cols)
+    return padded_anots, padded_preds
+
+def format_anots(anots):
+    max_cols = max([len(row) for batch in anots for row in batch])
+    max_rows = max([len(batch) for batch in anots])
+    padded_anots = [batch + [[0] * (max_cols)] * (max_rows - len(batch)) for batch in anots]
+    # padded_preds = [batch + [[0] * (max_cols)] * (max_rows - len(batch)) for batch in preds]
+    padded_anots = torch.tensor([row + [0] * (len(target) - len(row)) for batch in padded_anots for row in batch])
+    # padded_preds = torch.tensor([row + [0] * (len(target) - len(row)) for batch in padded_preds for row in batch])
+    padded_anots = padded_anots.view(-1, max_rows, max_cols)
+    # padded_preds = padded_preds.view(-1, max_rows, max_cols)
+    return padded_anots
