@@ -1,6 +1,4 @@
 from pathlib import Path
-import pandas as pd
-# import model, dataset
 from EffDetDataset import *
 from Model import *
 import torch
@@ -10,6 +8,7 @@ import argparse
 import os
 
 models_dir = "modelos/"
+dataset_dir = "../../datasets/Tomato_1280x720/"
 
 def validate_file(f):
     if not os.path.exists(f):
@@ -26,15 +25,14 @@ def dir_path(path):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-d','--dataset',type=dir_path, help="Directorio del dataset a partir del que crear el dataframe.")
     parser.add_argument('-e', '--epochs', type=int, help="Número de épocas de entrenamiento.")
     parser.add_argument('-n','--name',type=str)
     args = parser.parse_args()
-    dm = get_dm_standalone(args.dataset,args.name)
+    dm = get_dm_standalone(dataset_dir,args.name)
     model = EfficientDetModel()
-    model_name = f"ED_{args.epochs}ep"
+    model_name = f"{args.epochs}eps"
     if args.name!="no":
-        model_name = args.name+model_name
+        model_name = f"{args.name}_{model_name}"
     logger = TensorBoardLogger("lightning_logs/",name=model_name)
     trainer = Trainer(
         gpus = 1, max_epochs=args.epochs, num_sanity_val_steps=1, logger=logger,
