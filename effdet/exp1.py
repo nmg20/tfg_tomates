@@ -4,17 +4,7 @@ from EffDetDataset import *
 from Model import *
 import os
 import argparse
-
-# dataset_path = Path("../../tomates512/")
-# df_tr = pd.read_csv(dataset_path/"annotations/labelstrain.csv")
-# df_ts = pd.read_csv(dataset_path/"annotations/labelstest.csv")
-# df_vl = pd.read_csv(dataset_path/"annotations/labelsval.csv")
-
-# train_ds = TomatoDatasetAdaptor(dataset_path/"images/train/", df_tr)
-# test_ds = TomatoDatasetAdaptor(dataset_path/"images/test/", df_ts)
-# val_ds = TomatoDatasetAdaptor(dataset_path/"images/val/", df_vl)
-
-############################
+from Inference import *
 
 def validate_file(f):
     if not os.path.exists(f):
@@ -27,7 +17,9 @@ def dir_path(path):
     if os.path.isdir(path):
         return path
     else:
-        raise argparse.ArgumentTypeError(f"readable_dir:{path} is not a valid path")
+        # raise argparse.ArgumentTypeError(f"readable_dir:{path} is not a valid path")
+        # os.mkdir(path)
+        return path
 
 models_dir = "modelos/"
 preds_dir = "preds/"
@@ -46,24 +38,36 @@ def save_preds_m(model,e,ds,i,j,div):
     for i in list(range(len(imgs))):
         imgs[i].save(f"{d}/{name}{i}.jpg")
 
+# def main():
+#     parser = argparse.ArgumentParser()
+#     parser.add_argument('-d','--dataset',type=dir_path, help="Directorio del dataset a partir del que crear el dataframe.")
+#     parser.add_argument('-n','--name',type=str, help="Directorio del dataset a partir del que crear el dataframe.")
+#     parser.add_argument('-m', '--model', type=validate_file, help="Número de épocas de entrenamiento.")
+#     parser.add_argument('-e', '--eps', type=int, help="Número de épocas de entrenamiento.")
+#     # parser.add_argument('-p', '--prefix', type=str, help="Número de épocas de entrenamiento.")
+#     parser.add_argument('-div','--div',type=str)
+#     args = parser.parse_args()
+
+#     model = EfficientDetModel()
+#     # if args.div!=0:
+#     #     d = f"{models_dir}t{args.div}ED_{args.eps}ep.pt"
+#     # else:
+#     #     d = f"{models_dir}ED_{args.eps}ep.pt"
+#     model.load_state_dict(torch.load(args.model))
+#     train_ds, test_ds, val_ds = load_dss(args.dataset,args.name)
+#     save_preds_m(model,args.eps,test_ds,0,5,args.div)
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-d','--dataset',type=dir_path, help="Directorio del dataset a partir del que crear el dataframe.")
-    parser.add_argument('-n','--name',type=str, help="Directorio del dataset a partir del que crear el dataframe.")
     parser.add_argument('-m', '--model', type=validate_file, help="Número de épocas de entrenamiento.")
-    parser.add_argument('-e', '--eps', type=int, help="Número de épocas de entrenamiento.")
-    # parser.add_argument('-p', '--prefix', type=str, help="Número de épocas de entrenamiento.")
-    parser.add_argument('-div','--div',type=str)
-    args = parser.parse_args()
+    parser.add_argument('-o','--output',type=dir_path, help="Directorio del dataset a partir del que crear el dataframe.")
 
+    args = parser.parse_args()
+    output_dir = preds_dir if len(args.output)==1 else args.output
     model = EfficientDetModel()
-    # if args.div!=0:
-    #     d = f"{models_dir}t{args.div}ED_{args.eps}ep.pt"
-    # else:
-    #     d = f"{models_dir}ED_{args.eps}ep.pt"
     model.load_state_dict(torch.load(args.model))
-    train_ds, test_ds, val_ds = load_dss(args.dataset,args.name)
-    save_preds_m(model,args.eps,test_ds,0,5,args.div)
+    imgs = get_dir_imgs(data_dir)
+    inference(model,imgs,output_dir)
 
 if __name__=="__main__":
     main()
