@@ -1,6 +1,7 @@
 from pathlib import Path
 from EffDetDataset import *
 from Model import *
+from Train import *
 import torch
 from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import TensorBoardLogger
@@ -30,14 +31,12 @@ def main():
     args = parser.parse_args()
     dm = get_dm_standalone(dataset_dir,args.name)
     model = EfficientDetModel()
-    model_name = f"{args.epochs}eps"
-    if args.name!="no":
-        model_name = f"{args.name}_{model_name}"
+    model_name = args.name
+    # model_name = f"{args.epochs}eps"
+    # if args.name!="no":
+    #     model_name = f"{args.name}_{model_name}"
     logger = TensorBoardLogger("lightning_logs/",name=model_name)
-    trainer = Trainer(
-        gpus = 1, max_epochs=args.epochs, num_sanity_val_steps=1, logger=logger,
-    )
-    trainer.fit(model,dm)
+    train_model(model,dm,args.epochs,logger)
     torch.save(model.state_dict(),f"{models_dir}{model_name}.pt")
 
 
