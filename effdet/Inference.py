@@ -5,71 +5,37 @@ from Model import *
 import os
 import argparse
 
-# dataset_path = Path("../../tomates512/")
-# df_tr = pd.read_csv(dataset_path/"annotations/labelstrain.csv")
-# df_ts = pd.read_csv(dataset_path/"annotations/labelstest.csv")
-# df_vl = pd.read_csv(dataset_path/"annotations/labelsval.csv")
-
-# train_ds = TomatoDatasetAdaptor(dataset_path/"images/train/", df_tr)
-# test_ds = TomatoDatasetAdaptor(dataset_path/"images/test/", df_ts)
-# val_ds = TomatoDatasetAdaptor(dataset_path/"images/val/", df_vl)
+main_dataset = "../../datasets/Tomato_1280x720/"
+preds_dir = os.path.abspath("./preds/")
+data_dir = os.path.abspath("./data/")
 
 ############################
 
-def validate_file(f):
-    if not os.path.exists(f):
-        # Argparse uses the ArgumentTypeError to give a rejection message like:
-        # error: argument input: x does not exist
-        raise argparse.ArgumentTypeError("{0} does not exist".format(f))
-    return f
+def get_dir_imgs(imgs_dir):
+    return [Image.open(imgs_dir+"/"+x) for x in os.listdir(imgs_dir)]
 
-def dir_path(path):
-    if os.path.isdir(path):
-        return path
-    else:
-        raise argparse.ArgumentTypeError(f"readable_dir:{path} is not a valid path")
+def save_preds(imgs,bboxes,output_dir):
+    """
+    Las ímágenes deben haber sido abiertas con PIL.Image para poder
+    leer el nombre del fichero.
+    """
+    for i in range(len(imgs)):
+        img = draw_img(imgs[i],bboxes[i])
+        # img.save(f"{output_dir}/pred_{imgs[i].filename.split('/')[-1]}")
+        img.save(f"{os.path.abspath(output_dir)}/pred_{imgs[i].filename.split('/')[-1]}")
 
-models_dir = "modelos/"
-preds_dir = "preds/"
-
-############################
-
-def save_preds_m(model,e,ds,i,j,div):
-    model.eval()
-    imgs = get_preds(model,ds,i,j)
-    d = f"{preds_dir}{div}preds_{e}epochs"
-    name = f"{div}ED_{e}ep_test_"
-    if not os.path.exists(d):
+def check_output_dir(d=None):
+    if (d and not os.path.exists(d)) or (not d):
         os.mkdir(d)
-    else:
-        name = "alt_"+name
-    for i in list(range(len(imgs))):
-        imgs[i].save(f"{d}/{name}{i}.jpg")
 
-def main():
+def inference(model,imgs,output_dir=None):
     """
-    Leer dataset principal del .config.
-    Sacar el que tenga name==name.
-    Leer model de modelos
+    Si se le pasa un rango, coge las imágenes de imgs_dir en ese rango.
+    Se le pueden pasar también imágenes (PIL).
     """
-
-    parser = argparse.ArgumentParser()
-    # parser.add_argument('-d','--dataset',type=dir_path, help="Directorio del dataset a partir del que crear el dataframe.")
-    parser.add_argument('-n','--name',type=str, help="Directorio del dataset a partir del que crear el dataframe.")
-    parser.add_argument('-m', '--model', type=validate_file, help="Número de épocas de entrenamiento.")
-    # parser.add_argument('-e', '--eps', type=int, help="Número de épocas de entrenamiento.")
-    #parser.add_argument('-p', '--prefix', type=str, help="Número de épocas de entrenamiento.")
-    # parser.add_argument('-div','--div',type=str)
-    args = parser.parse_args()
-
-    model = EfficientDetModel()
-    # if args.div!=0:
-    #     d = f"{models_dir}t{args.div}ED_{args.eps}ep.pt"
-    # else:
-    #     d = f"{models_dir}ED_{args.eps}ep.pt"
-    model.load_state_dict(torch.load(args.model))
-    train_ds, test_ds, val_ds = load_dss(args.dataset,args.name)
-    save_preds_m(model,args.eps,test_ds,0,5,args.div)
-
-if __name__=="__main__":
-    main()
+    check_output_dir(output_dir)
+    if imgs==[]:
+        imgs = [Image.open(x) for x in os.listdir(data_dir)]
+    model.eval()
+    bboxes, _, _ = model.predict(imgs)
+    save_preds(imgs,bboxes,output_dir)
