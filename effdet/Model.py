@@ -170,16 +170,12 @@ class EfficientDetModel(LightningModule):
             "image_ids": image_ids,
         }
 
-        logging_losses = {
-            "box_loss": outputs["box_loss"].detach(),
-        }
+        logging_losses = {"box_loss": outputs["box_loss"].detach(),}
 
         self.log("test_loss", outputs["loss"], on_step=True, on_epoch=True, prog_bar=True,
                  logger=True, sync_dist=True)
-
         self.log("test_box_loss", logging_losses["box_loss"], on_step=True, on_epoch=True,
                  prog_bar=True, logger=True, sync_dist=True)
-
         return {'loss': outputs["loss"], 'batch_predictions': batch_predictions}
 
     @typedispatch
@@ -349,6 +345,8 @@ def validation_epoch_end(self: EfficientDetModel, outputs):
     validation_loss_mean = torch.stack(
         [output["loss"] for output in outputs]
     ).mean()
+    self.log("mean_val_loss", validation_loss_mean,on_step=False,on_epoch=True,prog_bar=False,
+        logger=True)
 
     (
         predicted_class_labels,
@@ -379,6 +377,46 @@ def validation_epoch_end(self: EfficientDetModel, outputs):
                  logger=True)
 
     return {"val_loss": validation_loss_mean, "metrics": stats}
+
+@patch
+def test_epoch_end(self: EfficientDetModel, outputs):
+    """Compute and log training loss and accuracy at the epoch level."""
+
+    test_loss_mean = torch.stack(
+        [output["loss"] for output in outputs]
+    ).mean()
+    self.log("mean_test_loss",test_loss_mean,on_step=False,on_epoch=True,prog_bar=False,
+        logger=True)
+
+    (
+        predicted_class_labels,
+        image_ids,
+        predicted_bboxes,
+        predicted_class_confidences,
+        targets,
+    ) = self.aggregate_prediction_outputs(outputs)
+
+    truth_image_ids = [target["image_id"].detach().item() for target in targets]
+    truth_boxes = [
+        target["bboxes"].detach()[:, [1, 0, 3, 2]].tolist() for target in targets
+    ] # convert to xyxy for evaluation
+    truth_labels = [target["labels"].detach().tolist() for target in targets]
+
+    stats = get_coco_stats(
+        prediction_image_ids=image_ids,
+        predicted_class_confidences=predicted_class_confidences,
+        predicted_bboxes=predicted_bboxes,
+        predicted_class_labels=predicted_class_labels,
+        target_image_ids=truth_image_ids,
+        target_bboxes=truth_boxes,
+        target_class_labels=truth_labels,
+    )['All']
+    # Logging de las estadísitcas de COCO
+    for k in stats.keys():
+        self.log(k,stats[k], on_step=False, on_epoch=True, prog_bar=False,
+                 logger=True)
+
+    return {"test_loss": test_loss_mean, "metrics": stats}
 
 def get_model():
     return EfficientDetModel()
@@ -429,50 +467,3 @@ def get_pred(model, ds, i):
     fig.canvas.get_width_height(),fig.canvas.tostring_rgb())
     plt.close("all")
     return image
-
-# def format_anots(anots,max_bbs):
-#     """
-#     Añade padding a los arrays de anotaciones de cada imagen para
-#     poder convertir la lista a tensor.
-#     anots : lista de np.arrays
-#     """
-#     if max_bbs==0:
-#         max_bbs = len(max(anots,key=len))
-#     padded = []
-#     for anot in anots:
-#         padded.append(np.pad(anot,[(0,(max_bbs-len(anot))),(0,0)]))
-#     return padded
-
-# def format_preds(preds,max_bbs):
-#     preds_array = []
-#     for pred in preds:
-#         preds_array.append(np.array(pred))
-#     return format_anots(preds_array,max_bbs)
-
-# def format_inference(anots,preds):
-#     max_bbs = len(max(anots,key=len))
-#     anots_tensor = torch.tensor(format_anots(anots,0))
-#     preds_tensor = torch.tensor(format_preds(preds,max_bbs))
-#     return anots_tensor, preds_tensor
-
-# def format_tensor(anots,preds):
-#     max_cols = max([len(row) for batch in anots for row in batch])
-#     max_rows = max([len(batch) for batch in anots])
-#     padded_anots = [batch + [[0] * (max_cols)] * (max_rows - len(batch)) for batch in anots]
-#     padded_preds = [batch + [[0] * (max_cols)] * (max_rows - len(batch)) for batch in preds]
-#     padded_anots = torch.tensor([row + [0] * (len(target) - len(row)) for batch in padded_anots for row in batch])
-#     padded_preds = torch.tensor([row + [0] * (len(target) - len(row)) for batch in padded_preds for row in batch])
-#     padded_anots = padded_anots.view(-1, max_rows, max_cols)
-#     padded_preds = padded_preds.view(-1, max_rows, max_cols)
-#     return padded_anots, padded_preds
-
-# def format_anots(anots):
-#     max_cols = max([len(row) for batch in anots for row in batch])
-#     max_rows = max([len(batch) for batch in anots])
-#     padded_anots = [batch + [[0] * (max_cols)] * (max_rows - len(batch)) for batch in anots]
-#     # padded_preds = [batch + [[0] * (max_cols)] * (max_rows - len(batch)) for batch in preds]
-#     padded_anots = torch.tensor([row + [0] * (len(target) - len(row)) for batch in padded_anots for row in batch])
-#     # padded_preds = torch.tensor([row + [0] * (len(target) - len(row)) for batch in padded_preds for row in batch])
-#     padded_anots = padded_anots.view(-1, max_rows, max_cols)
-#     # padded_preds = padded_preds.view(-1, max_rows, max_cols)
-#     return padded_anots
