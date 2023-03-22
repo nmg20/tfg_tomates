@@ -373,6 +373,7 @@ def validation_epoch_end(self: EfficientDetModel, outputs):
         target_bboxes=truth_boxes,
         target_class_labels=truth_labels,
     )['All']
+    # Logging de las estadísitcas de COCO
     for k in stats.keys():
         self.log(k,stats[k], on_step=False, on_epoch=True, prog_bar=False,
                  logger=True)
