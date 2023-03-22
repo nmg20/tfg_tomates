@@ -110,6 +110,13 @@ class TomatoDatasetAdaptor:
 
         return image, pascal_bboxes, class_labels, index
     
+    # def get_anots_of_image(self,image):
+    #     name = image.filename.split("/")[-1]
+    #     anots = self.annotations_df[self.annotations_df.image == name][
+    #         ["xmin", "ymin", "xmax", "ymax"]
+    #     ].values
+    #     return anots
+
     def show_image(self, index):
         image, bboxes, class_labels, image_id = self.get_image_and_labels_by_idx(index)
         print(f"image_id: {image_id}")
@@ -365,3 +372,6 @@ def get_dm_standalone(path,name):
 def get_dm2(name):
     train,test,val=load_dss(main_ds,name)
     return get_dm(train,val,test)
+
+def get_dms_dss(dm):
+    return dm.train_ds,dm.valid_ds,dm.test_ds
