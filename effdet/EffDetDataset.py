@@ -1,95 +1,19 @@
-import matplotlib.pyplot as plt
-from matplotlib import patches
 import numpy as np
 import cv2 as cv
 import torch
 torch.manual_seed(17)
 import pandas as pd
 from utils.dataset_to_csv import *
+from utils.Visualize import *
 
 datasets_dir = "/media/rtx3090/Disco2TB/cvazquez/nico/datasets/"
 main_ds = "/media/rtx3090/Disco2TB/cvazquez/nico/datasets/Tomato_1280x720/"
 
-def get_rectangle_edges_from_pascal_bbox(bbox):
-    xmin_top_left, ymin_top_left, xmax_bottom_right, ymax_bottom_right = bbox
-
-    bottom_left = (xmin_top_left, ymax_bottom_right)
-    width = xmax_bottom_right - xmin_top_left
-    height = ymin_top_left - ymax_bottom_right
-
-    return bottom_left, width, height
-
-def draw_pascal_voc_bboxes(
-    plot_ax,
-    bboxes,
-    get_rectangle_corners_fn=get_rectangle_edges_from_pascal_bbox,
-):
-    for bbox in bboxes:
-        bottom_left, width, height = get_rectangle_corners_fn(bbox)
-
-        plot_ax.add_patch(patches.Rectangle(
-            bottom_left,
-            width,
-            height,
-            linewidth=1,
-            edgecolor="orange",
-            fill=False,
-        ))
-
-def get_img_drawn(image, bboxes_anot, predicted_bboxes, loss, size=20):
-    """
-        image = imagen del dataset a predecir/dibujar
-        bboxes_anot = anotaciones originales de la imagen en el dataset
-        predicted_bboxes = anotaciones predecidas por el modelo
-    """
-    # plt.figure()
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(size,size))
-    # fig.suptitle(title,fontsize=size*(3/2))
-    ax1.imshow(image)
-    ax1.set_title(f"Imagen predecida\nLoss={loss}",fontsize=size*(5/4))
-    ax2.imshow(image)
-    ax2.set_title("Imagen anotada",fontsize=size*(5/4))
-    draw_pascal_voc_bboxes(ax1, predicted_bboxes)
-    draw_pascal_voc_bboxes(ax2, bboxes_anot.tolist())
-    fig.canvas.draw()
-    image = Image.frombytes('RGB', 
-        fig.canvas.get_width_height(),fig.canvas.tostring_rgb())
-    plt.close()
-    return image
-
-def draw_img(image, bboxes):
-    # plt.figure()
-    fig, ax = plt.subplots()
-    # for bbox in bboxes:
-    #     bb = np.array(bbox,dtype=np.float32)
-    #     rect = plt.Rectangle((bb[1], bb[0]), bb[3]-bb[1], bb[2]-bb[0], color='yellow',
-    #                      fill=False, lw=3)
-    #     plt.gca().add_patch(rect)
-    ax.imshow(image)
-    draw_pascal_voc_bboxes(ax,bboxes)
-    fig.canvas.draw()
-    image = Image.frombytes('RGB', 
-        fig.canvas.get_width_height(),fig.canvas.tostring_rgb())
-    plt.close()
-    return image
-
-def show_image(
-    image, bboxes=None, draw_bboxes_fn=draw_pascal_voc_bboxes, figsize=(10, 10)
-):
-    fig, ax = plt.subplots(1, figsize=figsize)
-    ax.imshow(image)
-
-    if bboxes is not None:
-        draw_bboxes_fn(ax, bboxes)
-
-    plt.show()
-
 from pathlib import Path
-from PIL import Image
-import numpy as np
 
-# def get_dir_imgs(path,anns):
-    
+def read_anots(image):
+    df = pd.read_csv(main_ds+"/ImageSets/all_annotations.csv")
+    return df[df.image==image.filename.split("/")[-1]][["xmin", "ymin", "xmax", "ymax"]].values
 
 class TomatoDatasetAdaptor:
     def __init__(self, images_dir_path, annotations_dataframe):
@@ -102,20 +26,27 @@ class TomatoDatasetAdaptor:
 
     def get_image_and_labels_by_idx(self, index):
         image_name = self.images[index]
-        image = Image.open(self.images_dir_path / image_name)
+        # image = Image.open(self.images_dir_path / image_name)
+        image = cv.imread(f"{str(self.images_dir_path)}/{image_name}")
         pascal_bboxes = self.annotations_df[self.annotations_df.image == image_name][
             ["xmin", "ymin", "xmax", "ymax"]
         ].values
         class_labels = np.ones(len(pascal_bboxes))
 
         return image, pascal_bboxes, class_labels, index
-    
-    # def get_anots_of_image(self,image):
-    #     name = image.filename.split("/")[-1]
-    #     anots = self.annotations_df[self.annotations_df.image == name][
-    #         ["xmin", "ymin", "xmax", "ymax"]
-    #     ].values
-    #     return anots
+
+    # def get_annots_of_img(self, image):
+    #     return self.annotations_df[self.annotations_df.image==image][
+    #         ["xmin","ymin","xmax","ymax"]].values
+
+    # def get_anots_array(self):
+    #     return self.annotations_df[["xmin","ymin","xmax","ymax"]].values
+
+    def get_imgs_and_anots(self):
+        return [self.get_image_and_labels_by_idx(i) for i in range(len(self.images))]    
+
+    # def get_imgs(self):
+    #     return [Image.open(Path(self.images_dir_path/x)) for x in self.images]
 
     def show_image(self, index):
         image, bboxes, class_labels, image_id = self.get_image_and_labels_by_idx(index)
@@ -123,9 +54,6 @@ class TomatoDatasetAdaptor:
         show_image(image, bboxes.tolist())
         print(class_labels)
 
-# tomato_train_ds = TomatoDatasetAdaptor(train_data_path, df)
-# cars_train_ds.show_image(0)
-# cars_train_ds.show_image(3)
 
 from torch.utils.data import Dataset
 import albumentations as A
@@ -300,7 +228,8 @@ class EfficientDetDataModule(LightningDataModule):
         test_dataset = self.test_dataset()
         test_loader = torch.utils.data.DataLoader(
             test_dataset,
-            batch_size=self.batch_size,
+            # batch_size=self.batch_size,
+            batch_size=1,
             shuffle=False,
             pin_memory=True,
             drop_last=False,
@@ -328,22 +257,6 @@ class EfficientDetDataModule(LightningDataModule):
         }
 
         return images, annotations, targets, image_ids
-
-# def create_ds(path):
-
-# def load_dss(path,name):
-#     dataset_path = Path(path)
-#     train_data_path = dataset_path/"images/train/"
-#     test_data_path = dataset_path/"images/test/"
-#     val_data_path = dataset_path/"images/val/"
-#     df_tr = pd.read_csv(dataset_path/"annotations/labelstrain.csv")
-#     df_ts = pd.read_csv(dataset_path/"annotations/labelstest.csv")
-#     df_vl = pd.read_csv(dataset_path/"annotations/labelsval.csv")
-
-#     train_ds = TomatoDatasetAdaptor(train_data_path, df_tr)
-#     test_ds = TomatoDatasetAdaptor(test_data_path, df_ts)
-#     val_ds = TomatoDatasetAdaptor(val_data_path, df_vl)
-#     return train_ds, test_ds, val_ds
 
 def load_dss(path,name):
     dataset_path = Path(path)
@@ -375,3 +288,35 @@ def get_dm2(name):
 
 def get_dms_dss(dm):
     return dm.train_ds,dm.valid_ds,dm.test_ds
+
+def get_main_df(path=main_ds):
+    dataset_path = Path(path)
+    return pd.read_csv(dataset_path/"ImageSets/all_annotations.csv")
+
+# def get_main_ds(path):
+#     dataset_path = Path(path)
+#     df = get_main_df(path)
+#     return TomatoDatasetAdaptor(dataset_path/"JPEGImages",df)
+
+def get_data_df(df, names):
+    """
+    Dado un dataframe maestro con todas las anotaciones y una lista de nombres,
+    (los de la carpeta /data), crea un dataframe con las anotaciones
+    correspondientes a las imágenes de la carpeta.
+    -> es necesario que las imágenes de la carpeta estén anotadas en el .csv maestro.
+    """
+    dfs=[]
+    for name in names:
+        dfs.append(df[df.image==name])
+    return pd.concat(dfs)
+
+def get_data_ds(names, path=main_ds):
+    """
+    Dada la ruta de las imágenes y los nombres, crea el df a partir del .csv maestro
+    y genera el dataset.
+    """
+    # Lee del .csv completo por defecto
+    dataset_path = Path(path)
+    main_df = get_main_df()
+    df = get_data_df(main_df,names)
+    return TomatoDatasetAdaptor(dataset_path/"JPEGImages",df)
