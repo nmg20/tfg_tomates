@@ -9,6 +9,8 @@ from EffDetDataset import *
 # from torchmetrics.detection import mean_ap as MAP
 import matplotlib.pyplot as plt
 
+models_path = os.path.abspath("./modelos/")
+
 def create_model(num_classes=1, image_size=512, architecture="tf_efficientnetv2_l"):
     efficientdet_model_param_dict[architecture] = dict(
         name=architecture,
@@ -37,6 +39,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from PIL import Image
+
+from torchvision.transforms import ToPILImage
 
 from torchvision.ops import box_iou
 from sklearn.metrics import average_precision_score
@@ -83,6 +87,7 @@ class EfficientDetModel(LightningModule):
         wbf_iou_threshold=0.44,
         inference_transforms=get_valid_transforms(target_img_size=512),
         model_architecture='tf_efficientnetv2_l',
+        output_dir="./outputs/"
     ):
         super().__init__()
         self.img_size = img_size
@@ -94,6 +99,8 @@ class EfficientDetModel(LightningModule):
         self.lr = learning_rate
         self.wbf_iou_threshold = wbf_iou_threshold
         self.inference_tfms = inference_transforms
+        self.output_dir = output_dir
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
         # self.metric = MAP()
 
     # @auto_move_data
@@ -113,16 +120,8 @@ class EfficientDetModel(LightningModule):
             "box_loss": losses["box_loss"].detach(),
         }
 
-        # print("\n\n",losses,"\n\n")
-
-        # loss = F.cross_entropy(losses['loss'],torch.tensor(annotations))
-
         self.log("train_loss", losses["loss"], on_step=True, on_epoch=True, prog_bar=True,
                  logger=True)
-        # self.log(
-        #     "train_class_loss", losses["class_loss"], on_step=True, on_epoch=True, prog_bar=True,
-        #     logger=True
-        # )
         self.log("train_box_loss", losses["box_loss"], on_step=True, on_epoch=True, prog_bar=True,
                  logger=True)
 
@@ -148,10 +147,6 @@ class EfficientDetModel(LightningModule):
 
         self.log("valid_loss", outputs["loss"], on_step=True, on_epoch=True, prog_bar=True,
                  logger=True, sync_dist=True)
-        # self.log(
-        #     "valid_class_loss", logging_losses["class_loss"], on_step=True, on_epoch=True,
-        #     prog_bar=True, logger=True, sync_dist=True
-        # )
         self.log("valid_box_loss", logging_losses["box_loss"], on_step=True, on_epoch=True,
                  prog_bar=True, logger=True, sync_dist=True)
 
@@ -159,9 +154,8 @@ class EfficientDetModel(LightningModule):
     
     @torch.no_grad()
     def test_step(self, batch, batch_idx):
-        images, annotations, targets, image_ids = batch
-        outputs = self.model(images, annotations)
-
+        image, annotations, targets, image_ids = batch
+        outputs = self.model(image, annotations)
         detections = outputs["detections"]
 
         batch_predictions = {
@@ -169,6 +163,28 @@ class EfficientDetModel(LightningModule):
             "targets": targets,
             "image_ids": image_ids,
         }
+        # print(f"\n\nDetections: {detections}\n\n")
+
+        losses = [outputs["loss"],outputs["box_loss"]]
+        # print(f"\nImages: {images}\n\nGTs: {annotations}\n\nPreds: {detections}\n\nLosses: {losses}\n\n")
+        # Images = tensor
+        # GTS = dict{'bbox','cls','img_size','img_scale'}
+        # Preds = tensor de los bboxes
+        # Losses = [tensor, tensor]
+
+        # print("\n\nImage :", image.squeeze(0).cpu().numpy()[0,:,:])
+        # print("\n\nGTs: ",annotations['bbox'][0].cpu().numpy())
+        print("\n\nPreds: ",detections.squeeze(0).cpu().numpy())
+        # skippear últimas 2 columnas
+    
+
+        # draw_img_mod(image.squeeze(0).cpu().numpy()[0,:,:],
+        # draw_img_mod(image.squeeze(0).cpu().numpy()[0,:,:],
+        #     annotations['bbox'][0].cpu().numpy(),
+        #     detections.squeeze(0).cpu().numpy(),losses,"outputs/test")
+
+        # draw_img_mod(images[0],annotations[0],losses,"test1",)
+        # draw_imgs(images,annotations,detections,losses,"test")
 
         logging_losses = {"box_loss": outputs["box_loss"].detach(),}
 
@@ -429,41 +445,41 @@ def load_model(path):
     return model.load_state_dict(torch.load(path))
 
 def load_ex_model(model, path):
-    model.load_state_dict(torch.load(path))
+    model.load_state_dict(torch.load(models_path+"/"+path+".pt"))
 
 # def get_batch(model,ds,i):
 #     img, anots, 
 
-def get_imgs_anots_preds(model,ds,i,j):
-    imgs,anots = [],[]
-    for k in list(range(i,j)):
-        img, anot,_,_ = ds.get_image_and_labels_by_idx(k)
-        imgs.append(img)
-        anots.append(anot)
-    pred, _, _ = model.predict(imgs)
-    return imgs,anots,pred
+# def get_imgs_anots_preds(model,ds,i,j):
+#     imgs,anots = [],[]
+#     for k in list(range(i,j)):
+#         img, anot,_,_ = ds.get_image_and_labels_by_idx(k)
+#         imgs.append(img)
+#         anots.append(anot)
+#     pred, _, _ = model.predict(imgs)
+#     return imgs,anots,pred
 
-def get_preds(model,ds,i,j):
-    imgs, anots, preds = get_imgs_anots_preds(model,ds,i,j)
-    pred_imgs = []
-    for k in list(range(len(imgs))):
-        pred_imgs.append(get_img_drawn(imgs[k],anots[k],preds[k]))
-    return pred_imgs
+# def get_preds(model,ds,i,j):
+#     imgs, anots, preds = get_imgs_anots_preds(model,ds,i,j)
+#     pred_imgs = []
+#     for k in list(range(len(imgs))):
+#         pred_imgs.append(get_img_drawn(imgs[k],anots[k],preds[k]))
+#     return pred_imgs
 
-def get_pred(model, ds, i):
-    img, box, _, _ = ds.get_image_and_labels_by_idx(i)
-    pred, _ ,_ = model.predict([img])
-    plt.figure()
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(30,30))
-    ax1.imshow(img)
-    ax1.set_title("Predicción")
-    ax2.imshow(img)
-    ax2.set_title("Anotada")
-    draw_pascal_voc_bboxes(ax1, pred[0])
-    draw_pascal_voc_bboxes(ax2, box.tolist())
-    # plt.savefig(path+Path(imgs[i].filename).name)
-    fig.canvas.draw()
-    image = Image.frombytes('RGB', 
-    fig.canvas.get_width_height(),fig.canvas.tostring_rgb())
-    plt.close("all")
-    return image
+# def get_pred(model, ds, i):
+#     img, box, _, _ = ds.get_image_and_labels_by_idx(i)
+#     pred, _ ,_ = model.predict([img])
+#     plt.figure()
+#     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(30,30))
+#     ax1.imshow(img)
+#     ax1.set_title("Predicción")
+#     ax2.imshow(img)
+#     ax2.set_title("Anotada")
+#     draw_pascal_voc_bboxes(ax1, pred[0])
+#     draw_pascal_voc_bboxes(ax2, box.tolist())
+#     # plt.savefig(path+Path(imgs[i].filename).name)
+#     fig.canvas.draw()
+#     image = Image.frombytes('RGB', 
+#     fig.canvas.get_width_height(),fig.canvas.tostring_rgb())
+#     plt.close("all")
+#     return image
