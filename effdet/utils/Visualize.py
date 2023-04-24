@@ -1,9 +1,9 @@
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib import patches
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw as D, ImageFont
 import os
-import cv2 as cv
 
 colors = ["red","orange","yellow","green","blue","purple"]
 
@@ -15,6 +15,18 @@ def get_rectangle_edges_from_pascal_bbox(bbox):
     height = ymin_top_left - ymax_bottom_right
 
     return bottom_left, width, height
+
+def edges(bbox):
+    x1,y1,x2,y2 = bbox
+    minx,miny,maxx, maxy = min(x1,x2),min(y1,y2),max(x1,x2),max(y1,y2)
+    return ((minx,miny),(maxx,maxy))
+
+def get_bbox_dim(bbox):
+    xmin_top_left, ymin_top_left, xmax_bottom_right, ymax_bottom_right = bbox
+    width = xmax_bottom_right - xmin_top_left
+    height = ymin_top_left - ymax_bottom_right
+
+    return width, height
 
 def draw_pascal_voc_bboxes(
     plot_ax,
@@ -33,12 +45,36 @@ def draw_pascal_voc_bboxes(
             fill=False,
         ))
 
-def draw_bboxes(image, bboxes):
-    img = image.copy()
-    for bbox in bboxes:
-        cv.rectangle(img,(bbox[0],bbox[1]),(bbox[2],bbox[3]),
-            "green", 1)
-    return img
+# def draw_bboxes(image, bboxes, confs, 
+#     get_rectangle_corners_fn=get_rectangle_edges_from_pascal_bbox):
+#     img = ImageDraw.Draw(image)
+#     for bbox, conf in zip(bboxes,confs):
+#         bl, w, h = get_rectangle_corners_fn(bbox)
+#         (x1,y1),(x2,y2) = edges(bbox)
+#         img.rectangle([(bl,w,h)], fill=False, outline="green")
+#         img.text((bl[0]+(w//2),bl[1]+(h*1.1)),str(conf)[0:4],
+#             font=ImageFont.truetype("arial"))
+#     return img
+
+def draw_bboxes_conf(plot_ax, bboxes, confs,
+    get_rectangle_corners_fn=get_rectangle_edges_from_pascal_bbox,
+):
+    for bbox, conf in zip(bboxes,confs):
+        bottom_left, width, height = get_rectangle_corners_fn(bbox)
+        (x1,y1),(x2,y2) = edges(bbox)
+        plot_ax.add_patch(patches.Rectangle(
+            bottom_left,
+            width,
+            height,
+            linewidth=3,
+            edgecolor="orange",
+            fill=False,
+        ))
+        plot_ax.text(bottom_left[0]+0.5*width,y2,
+            str(conf)[0:4], fontsize=24,
+        horizontalalignment='center',
+        verticalalignment='top',color="orange")
+
 
 def get_img_drawn(image, bboxes_anot, predicted_bboxes, loss, size=20):
     """
@@ -61,35 +97,39 @@ def get_img_drawn(image, bboxes_anot, predicted_bboxes, loss, size=20):
     plt.close()
     return image
 
-def draw_img(image, bboxes):
-    # plt.figure()
-    fig, ax = plt.subplots()
-    # for bbox in bboxes:
-    #     bb = np.array(bbox,dtype=np.float32)
-    #     rect = plt.Rectangle((bb[1], bb[0]), bb[3]-bb[1], bb[2]-bb[0], color='yellow',
-    #                      fill=False, lw=3)
-    #     plt.gca().add_patch(rect)
-    ax.imshow(image)
-    draw_pascal_voc_bboxes(ax,bboxes)
-    fig.canvas.draw()
-    image = Image.frombytes('RGB', 
-        fig.canvas.get_width_height(),fig.canvas.tostring_rgb())
-    plt.close()
-    return image
+# def draw_img(image, bboxes):
+#     fig, ax = plt.subplots()
+#     ax.imshow(image)
+#     draw_pascal_voc_bboxes(ax,bboxes)
+#     fig.canvas.draw()
+#     image = Image.frombytes('RGB', 
+#         fig.canvas.get_width_height(),fig.canvas.tostring_rgb())
+#     plt.close()
+#     return image
 
-def draw_img(image, gt, bboxes, losses):
-    fig, (ax1, ax2) = plt.subplots(1,2)
-    ax1.imshow(image)
-    # ax1.set_title(f"loss: {losses[0]}, box_loss: {losses[1]}")
-    ax2.imshow(image)
-    ax2.set_title("Ground Truth (imagen anotada)")
-    draw_pascal_voc_bboxes(ax1,bboxes)
-    draw_pascal_voc_bboxes(ax2,gt)
-    fig.canvas.draw()
-    image = Image.frombytes('RGB', 
-        fig.canvas.get_width_height(),fig.canvas.tostring_rgb())
-    plt.close()
-    return image
+# def draw_img(image, gt, bboxes, losses):
+#     fig, (ax1, ax2) = plt.subplots(1,2)
+#     ax1.imshow(image)
+#     # ax1.set_title(f"loss: {losses[0]}, box_loss: {losses[1]}")
+#     ax2.imshow(image)
+#     ax2.set_title("Ground Truth (imagen anotada)")
+#     draw_pascal_voc_bboxes(ax1,bboxes)
+#     draw_pascal_voc_bboxes(ax2,gt)
+#     fig.canvas.draw()
+#     image = Image.frombytes('RGB', 
+#         fig.canvas.get_width_height(),fig.canvas.tostring_rgb())
+#     plt.close()
+#     return image
+
+def draw_image(image, bboxes, confs, name):
+    fig, ax = plt.subplots(figsize=(40,40))
+    ax.imshow(image)
+    draw_bboxes_conf(ax,bboxes,confs)
+    plt.savefig(f"{name}.png", dpi=100)
+    # canvas = FigureCanvasAgg(fig)
+    # canvas.draw()
+    # img = Image.fromarray(np.asarray(canvas.buffer_rgba()))
+    # return img
 
 # def draw_multipred(image, gt, bboxes, losses):
 #     """
@@ -143,6 +183,7 @@ def uniquify_dir(name):
     counter = 1
     while os.path.isdir(dirname.format(counter)):
         counter += 1
+    # os.mkdir(dirname.format(counter))
     return dirname.format(counter)
 
 def draw_img_mod(image,gts,bboxes,losses,name):

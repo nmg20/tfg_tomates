@@ -100,24 +100,6 @@ def xml_to_csv(ds_xmls):
     xml_df = pd.DataFrame(xml_list, columns=column_name)
     return xml_df
 
-def xml_to_csv(ds_xmls):
-    xml_list = []
-    for xml_file in ds_xmls:
-        tree = ET.parse(xml_file)
-        root = tree.getroot()
-        for member in root.findall('object'):
-            bbx = member.find('bndbox')
-            xmin = float(bbx.find('xmin').text)
-            ymin = float(bbx.find('ymin').text)
-            xmax = float(bbx.find('xmax').text)
-            ymax = float(bbx.find('ymax').text)
-            label = member.find('name').text
-            value = (root.find('filename').text,xmin,ymin,xmax,ymax)
-            xml_list.append(value)
-    column_name = ['image', 'xmin', 'ymin', 'xmax', 'ymax']
-    xml_df = pd.DataFrame(xml_list, columns=column_name)
-    return xml_df
-
 def create_ds(path,name,div):
     """
     Dado un directorio(dataset original), crea otro con nombre "name" y lo
