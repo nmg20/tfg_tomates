@@ -26,8 +26,7 @@ class TomatoDatasetAdaptor:
 
     def get_image_and_labels_by_idx(self, index):
         image_name = self.images[index]
-        # image = Image.open(self.images_dir_path / image_name)
-        image = cv.imread(f"{str(self.images_dir_path)}/{image_name}")
+        image = Image.open(self.images_dir_path / image_name)
         pascal_bboxes = self.annotations_df[self.annotations_df.image == image_name][
             ["xmin", "ymin", "xmax", "ymax"]
         ].values
