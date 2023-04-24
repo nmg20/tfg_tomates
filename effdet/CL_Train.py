@@ -19,11 +19,8 @@ def validate_file(f):
     return f
 
 def dir_path(path):
-    if os.path.isdir(path):
-        return path
-    else:
-        raise argparse.ArgumentTypeError(f"readable_dir:{path} is not a valid path")
-
+    return Path(path).mkdir(parents=True, exist_ok=True)
+    
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-e', '--epochs', type=int, help="Número de épocas de entrenamiento.")

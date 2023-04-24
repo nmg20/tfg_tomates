@@ -17,7 +17,7 @@ def main():
     dm = get_dm_standalone(dataset_dir,args.name)
     model = EfficientDetModel()
     load_ex_model(model,models_dir+args.name+".pt")
-    logger = TensorBoardLogger("lightning_logs/",name=args.name+"_test")
+    logger = TensorBoardLogger("lightning_logs/tests",name=args.name+"_test")
     test_model(model,dm,logger)
 if __name__=="__main__":
     main()
