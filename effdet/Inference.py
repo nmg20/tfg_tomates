@@ -92,10 +92,11 @@ def read_imageset_names(ds="d801010"):
     se encuentran en la carpeta /data.
     """
     file = open(imagesets_dir+ds+"/test.txt")
-    return [x+".jpg" for x in file.read().split("\n")[::-1]]
+    names = [x+".jpg" for x in file.read().split("\n")[::-1]]
+    return names[0:44]
 
 
-def inference(model,data_dir=data_dir,output_dir=output_dir):
+def inferencev1(model,data_dir=data_dir,output_dir=output_dir):
     """
     A partir de un directorio crea un ds ad-hoc, lee de un fichero maestro
     las anotaciones, infiere los resultados y os vuelca en un directorio "output_dir".
@@ -112,11 +113,8 @@ def inference(model,data_dir=data_dir,output_dir=output_dir):
     # bboxes = simplify_bboxes(bboxes)
     save_hist(bboxes,str(output)+"/areas_histogram.png",True)
     save_hist(confs,str(output)+"/confidences_histogram.png",False)
-    # criterion = CE()
     for image, bbox, conf in zip(images, bboxes, confs):
         name = str(output)+"/"+image.filename.split("/")[-1].split(".")[0]
-        # save_hist([bbox_area(x) for x in bbox],name+"_areas_hist.png")
-        # save_hist(conf, name+"_confs_hist.png")
         draw_image(image, bbox, conf, name)
 
 def inferencev2(model,ds="d801010",output_dir=output_dir):
@@ -130,15 +128,19 @@ def inferencev2(model,ds="d801010",output_dir=output_dir):
     model.eval()
     images, anots = [i for i,_,_,_ in data_ds.get_imgs_and_anots()],[i for _,i,_,_ in data_ds.get_imgs_and_anots()]
     bboxes,_,confs = model.predict(images)
-    bboxes = simplify_bboxes(bboxes)
-    save_hist(bboxes,"areas_histogram.png",True)
-    save_hist(confs,"areas_histogram.png")
-    # criterion = CE()
+    save_hist(bboxes,str(output)+f"/areas_histogram_{ds}.png",True)
+    save_hist(confs,str(output)+f"/confidences_histogram_{ds}.png",False)
     for image, bbox, conf in zip(images, bboxes, confs):
         name = str(output)+"/"+image.filename.split("/")[-1].split(".")[0]
-        # save_hist([bbox_area(x) for x in bbox],name+"_areas_hist.png")
-        # save_hist(conf, name+"_confs_hist.png")
         draw_image(image, bbox, conf, name)
+    # names = [str(output)+"/"+image.filename.split("/")[-1].split(".")[0] for image in images]
+    # draw_images(images, bboxes, confs, names)
+
+def inference(model_name="d801010",version=2):
+    if version==2:
+        inferencev2(load_model(model_name),model_name)
+    else:
+        inferencev1(load_model(model_name))
 
 """
 data_ds = get_data_ds(get_dir_imgs_names())
