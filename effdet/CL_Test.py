@@ -15,8 +15,9 @@ def main():
     parser.add_argument('-n','--name',type=str)
     args = parser.parse_args()
     dm = get_dm_standalone(dataset_dir,args.name)
-    model = EfficientDetModel()
-    load_ex_model(model,models_dir+args.name+".pt")
+    # model = EfficientDetModel()
+    # load_ex_model(model,models_dir+args.name+".pt")
+    model = load_model(args.name)
     logger = TensorBoardLogger("lightning_logs/tests",name=args.name+"_test")
     test_model(model,dm,logger)
 if __name__=="__main__":
