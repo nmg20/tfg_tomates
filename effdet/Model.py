@@ -157,34 +157,16 @@ class EfficientDetModel(LightningModule):
         image, annotations, targets, image_ids = batch
         outputs = self.model(image, annotations)
         detections = outputs["detections"]
+        # print(f"Anots: {len(annotations[0])}\n")
+        # print(f"Detections: {len(detections[0])}\n")
 
         batch_predictions = {
             "predictions": detections,
             "targets": targets,
             "image_ids": image_ids,
         }
-        # print(f"\n\nDetections: {detections}\n\n")
-
         losses = [outputs["loss"],outputs["box_loss"]]
-        # print(f"\nImages: {images}\n\nGTs: {annotations}\n\nPreds: {detections}\n\nLosses: {losses}\n\n")
-        # Images = tensor
-        # GTS = dict{'bbox','cls','img_size','img_scale'}
-        # Preds = tensor de los bboxes
-        # Losses = [tensor, tensor]
-
-        # print("\n\nImage :", image.squeeze(0).cpu().numpy()[0,:,:])
-        # print("\n\nGTs: ",annotations['bbox'][0].cpu().numpy())
-        print("\n\nPreds: ",detections.squeeze(0).cpu().numpy())
-        # skippear últimas 2 columnas
-    
-
-        # draw_img_mod(image.squeeze(0).cpu().numpy()[0,:,:],
-        # draw_img_mod(image.squeeze(0).cpu().numpy()[0,:,:],
-        #     annotations['bbox'][0].cpu().numpy(),
-        #     detections.squeeze(0).cpu().numpy(),losses,"outputs/test")
-
-        # draw_img_mod(images[0],annotations[0],losses,"test1",)
-        # draw_imgs(images,annotations,detections,losses,"test")
+        # print("\n\nPreds: ",detections.squeeze(0).cpu().numpy())
 
         logging_losses = {"box_loss": outputs["box_loss"].detach(),}
 
@@ -260,6 +242,7 @@ class EfficientDetModel(LightningModule):
         scaled_bboxes = self.__rescale_bboxes(
             predicted_bboxes=predicted_bboxes, image_sizes=image_sizes
         )
+        # print(scaled_bboxes)
 
         return scaled_bboxes, predicted_class_labels, predicted_class_confidences
     
@@ -310,10 +293,10 @@ class EfficientDetModel(LightningModule):
                     (
                         np.array(bboxes)
                         * [
-                            im_w / self.img_size,
-                            im_h / self.img_size,
-                            im_w / self.img_size,
-                            im_h / self.img_size,
+                            round(im_w / self.img_size,2),
+                            round(im_h / self.img_size,2),
+                            round(im_w / self.img_size,2),
+                            round(im_h / self.img_size,2),
                         ]
                     ).tolist()
                 )
@@ -442,7 +425,8 @@ def load_checkpoint(path):
 
 def load_model(path):
     model = EfficientDetModel(num_classes=1, img_size=512)
-    return model.load_state_dict(torch.load(path))
+    model.load_state_dict(torch.load(models_path+"/"+path+".pt"))
+    return model
 
 def load_ex_model(model, path):
     model.load_state_dict(torch.load(models_path+"/"+path+".pt"))
