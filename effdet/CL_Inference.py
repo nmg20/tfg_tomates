@@ -9,6 +9,10 @@ import argparse
 models_dir = "./modelos/"
 preds_dir = "./preds/"
 
+imagesets_dir = "../../datasets/Tomato_1280x720/ImageSets/"
+data_dir = os.path.abspath("./data/")
+output_dir = os.path.abspath("./outputs/")
+
 def validate_file(f):
     if not os.path.exists(f):
         # Argparse uses the ArgumentTypeError to give a rejection message like:
@@ -22,14 +26,14 @@ def dir_path(path):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-m', '--model', type=str, help="Número de épocas de entrenamiento.")
-    parser.add_argument('-o','--output',type=dir_path, help="Directorio del dataset a partir del que crear el dataframe.")
+    # parser.add_argument('-o','--output',type=dir_path, help="Directorio del dataset a partir del que crear el dataframe.")
+    parser.add_argument('-v','--version',type=int, help="Directorio del dataset a partir del que crear el dataframe.")
 
     args = parser.parse_args()
     # output_dir = preds_dir if len(args.output)==1 else args.output
-    model = EfficientDetModel()
-    model.load_state_dict(torch.load(models_dir+args.model+".pt"))
-    imgs = get_dir_imgs(data_dir)
-    inference(model,imgs,args.output+"/")
+    # model = load_model(args.model)
+    # imgs = get_dir_imgs(data_dir)
+    inference(args.model,args.version)
 
 if __name__=="__main__":
     main()

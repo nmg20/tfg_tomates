@@ -8,6 +8,7 @@ import argparse
 from torch.nn import CrossEntropyLoss as CE
 
 preds_dir = "./preds/"
+imagesets_dir = "../../datasets/Tomato_1280x720/ImageSets/"
 data_dir = os.path.abspath("./data/")
 output_dir = os.path.abspath("./outputs/")
 
@@ -26,54 +27,73 @@ Proceso de inferencia (nuevo):
 def get_dir_imgs_names(imgs_dir=data_dir):
     return [x for x in os.listdir(imgs_dir) if x[len(x)-4::]=='.jpg']
 
-# def get_dir_imgs(imgs_dir=data_dir):
-#     return [Image.open(imgs_dir+"/"+x) for x in os.listdir(imgs_dir)]
-
-# def save_preds(imgs,bboxes,output_dir):
+# def intersect(box_a, box_b):
+#     """ We resize both tensors to [A,B,2] without new malloc:
+#     [A,2] -> [A,1,2] -> [A,B,2]
+#     [B,2] -> [1,B,2] -> [A,B,2]
+#     Then we compute the area of intersect between box_a and box_b.
+#     Args:
+#       box_a: (tensor) bounding boxes, Shape: [A,4].
+#       box_b: (tensor) bounding boxes, Shape: [B,4].
+#     Return:
+#       (tensor) intersection area, Shape: [A,B].
 #     """
-#     Las ímágenes deben haber sido abiertas con PIL.Image para poder
-#     leer el nombre del fichero.
-#     """
-#     for i in range(len(imgs)):
-#         img = draw_img(imgs[i],bboxes[i])
-#         img.save(f"{output_dir}/pred_{imgs[i].filename.split('/')[-1]}")
-#         # img.save(f"{Path(output_dir)}/anot_{imgs[i].filename.split('/')[-1]}")
+#     A = box_a.size(0)
+#     B = box_b.size(0)
+#     max_xy = torch.min(box_a[:, 2:].unsqueeze(1).expand(A, B, 2),
+#                        box_b[:, 2:].unsqueeze(0).expand(A, B, 2))
+#     min_xy = torch.max(box_a[:, :2].unsqueeze(1).expand(A, B, 2),
+#                        box_b[:, :2].unsqueeze(0).expand(A, B, 2))
+#     inter = torch.clamp((max_xy - min_xy), min=0)
+#     return inter[:, :, 0] * inter[:, :, 1]
 
-# def save_preds_metric(imgs,bboxes,output_dir,losses):
+# def jaccard(box_a, box_b):
+#     """Compute the jaccard overlap of two sets of boxes.  The jaccard overlap
+#     is simply the intersection over union of two boxes.  Here we operate on
+#     ground truth boxes and default boxes.
+#     E.g.:
+#         A ∩ B / A ∪ B = A ∩ B / (area(A) + area(B) - A ∩ B)
+#     Args:
+#         box_a: (tensor) Ground truth bounding boxes, Shape: [num_objects,4]
+#         box_b: (tensor) Prior boxes from priorbox layers, Shape: [num_priors,4]
+#     Return:
+#         jaccard overlap: (tensor) Shape: [box_a.size(0), box_b.size(0)]
 #     """
-#     Las ímágenes deben haber sido abiertas con PIL.Image para poder
-#     leer el nombre del fichero.
-#     """
-#     for i in range(len(imgs)):
-#         img = draw_img(imgs[i],bboxes[i],losses[i])
-#         img.save(f"{output_dir}/pred_{imgs[i].filename.split('/')[-1]}")
-#         # img.save(f"{Path(output_dir)}/anot_{imgs[i].filename.split('/')[-1]}")
-
-# def get_ground_truths(output_dir, imgs_dir=data_dir):
-#     """
-#     Dadas las imágenes en un directorio, busca sus anotaciones.
-#     """
-#     images = get_dir_imgs(imgs_dir)
-#     anots = [read_anots(x) for x in images]
-#     save_preds(images,anots,preds_dir+output_dir)
-
-# def get_hist(data):
-#     bins = len(list(set(data)))
-#     counts, bins, _ = plt.hist(data,bins=bins)
-
-# def save_confs_and_areas(bboxes, confs):
-#     areas, cfs = [], []
-#     for bbox in bboxes:
-#         w,h = get_bbox_dim(bbox)
-#         areas.append(w*h)
-
-def save_hist(data, name):
-    fig, ax = plt.subplots(figsize=(20,20))
-    plt.hist(data)
-    plt.savefig(name)
+#     inter = intersect(box_a, box_b)
+#     area_a = ((box_a[:, 2]-box_a[:, 0]) *
+#               (box_a[:, 3]-box_a[:, 1])).unsqueeze(1).expand_as(inter)  # [A,B]
+#     area_b = ((box_b[:, 2]-box_b[:, 0]) *
+#               (box_b[:, 3]-box_b[:, 1])).unsqueeze(0).expand_as(inter)  # [A,B]
+#     union = area_a + area_b - inter
+#     return inter / union  # [A,B]
 
 def bbox_area(bbox):
     return (bbox[2]-bbox[0])*(bbox[3]-bbox[1])
+
+def save_hist(data, name, bboxes=False):
+    """
+    Recibe una lista anidada (confianzas de las predicciones o los
+    bounding boxes), la aplana, dibuja su histograma y lo guarda.
+    """
+    data = [item for sublist in data for item in sublist]
+    if bboxes==True:
+        data = [bbox_area(x) for x in data]
+    fig, ax = plt.subplots(figsize=(20,20))
+    plt.hist(data)
+    plt.savefig(name)
+    plt.close()
+
+def simplify_bboxes(bboxes):
+    return [[[round(x,2) for x in bbox] for bbox in bboxs] for bboxs in bboxes]
+
+def read_imageset_names(ds="d801010"):
+    """
+    Lee del set de imágenes de un dataset los nombres para emular que 
+    se encuentran en la carpeta /data.
+    """
+    file = open(imagesets_dir+ds+"/test.txt")
+    return [x+".jpg" for x in file.read().split("\n")[::-1]]
+
 
 def inference(model,data_dir=data_dir,output_dir=output_dir):
     """
@@ -89,13 +109,36 @@ def inference(model,data_dir=data_dir,output_dir=output_dir):
     model.eval()
     images, anots = [i for i,_,_,_ in data_ds.get_imgs_and_anots()],[i for _,i,_,_ in data_ds.get_imgs_and_anots()]
     bboxes,_,confs = model.predict(images)
-    criterion = CE()
+    # bboxes = simplify_bboxes(bboxes)
+    save_hist(bboxes,str(output)+"/areas_histogram.png",True)
+    save_hist(confs,str(output)+"/confidences_histogram.png",False)
+    # criterion = CE()
     for image, bbox, conf in zip(images, bboxes, confs):
         name = str(output)+"/"+image.filename.split("/")[-1].split(".")[0]
-        save_hist([bbox_area(x) for x in bbox],name+"_areas_hist.png")
-        save_hist(conf, name+"_confs_hist.png")
+        # save_hist([bbox_area(x) for x in bbox],name+"_areas_hist.png")
+        # save_hist(conf, name+"_confs_hist.png")
         draw_image(image, bbox, conf, name)
 
+def inferencev2(model,ds="d801010",output_dir=output_dir):
+    """
+    Versión con una ruta a un ImageSet en lugar de leer los nombres
+    de los ficheros en el directorio /data.
+    """
+    output=Path(uniquify_dir(output_dir+"/run"))
+    os.mkdir(output)
+    data_ds = get_data_ds(read_imageset_names(ds))
+    model.eval()
+    images, anots = [i for i,_,_,_ in data_ds.get_imgs_and_anots()],[i for _,i,_,_ in data_ds.get_imgs_and_anots()]
+    bboxes,_,confs = model.predict(images)
+    bboxes = simplify_bboxes(bboxes)
+    save_hist(bboxes,"areas_histogram.png",True)
+    save_hist(confs,"areas_histogram.png")
+    # criterion = CE()
+    for image, bbox, conf in zip(images, bboxes, confs):
+        name = str(output)+"/"+image.filename.split("/")[-1].split(".")[0]
+        # save_hist([bbox_area(x) for x in bbox],name+"_areas_hist.png")
+        # save_hist(conf, name+"_confs_hist.png")
+        draw_image(image, bbox, conf, name)
 
 """
 data_ds = get_data_ds(get_dir_imgs_names())
@@ -105,6 +148,7 @@ model.eval()
 #imgs,anots = map(list,zip(*data_ds.get_imgs_and_anots()))
 imgs, anots = [i for i,_,_,_ in data_ds.get_imgs_and_anots()],[i for _,i,_,_ in data_ds.get_imgs_and_anots()]
 bboxes,_,confs = model.predict(imgs)
+bboxes = simplify_bboxes(bboxes)
 
 
 """
