@@ -28,33 +28,22 @@ def get_bbox_dim(bbox):
 
     return width, height
 
-def draw_pascal_voc_bboxes(
-    plot_ax,
-    bboxes,
-    get_rectangle_corners_fn=get_rectangle_edges_from_pascal_bbox,
-):
-    for bbox in bboxes:
-        bottom_left, width, height = get_rectangle_corners_fn(bbox)
+# def draw_pascal_voc_bboxes(
+#     plot_ax,
+#     bboxes,
+#     get_rectangle_corners_fn=get_rectangle_edges_from_pascal_bbox,
+# ):
+#     for bbox in bboxes:
+#         bottom_left, width, height = get_rectangle_corners_fn(bbox)
 
-        plot_ax.add_patch(patches.Rectangle(
-            bottom_left,
-            width,
-            height,
-            linewidth=1,
-            edgecolor="orange",
-            fill=False,
-        ))
-
-# def draw_bboxes(image, bboxes, confs, 
-#     get_rectangle_corners_fn=get_rectangle_edges_from_pascal_bbox):
-#     img = ImageDraw.Draw(image)
-#     for bbox, conf in zip(bboxes,confs):
-#         bl, w, h = get_rectangle_corners_fn(bbox)
-#         (x1,y1),(x2,y2) = edges(bbox)
-#         img.rectangle([(bl,w,h)], fill=False, outline="green")
-#         img.text((bl[0]+(w//2),bl[1]+(h*1.1)),str(conf)[0:4],
-#             font=ImageFont.truetype("arial"))
-#     return img
+#         plot_ax.add_patch(patches.Rectangle(
+#             bottom_left,
+#             width,
+#             height,
+#             linewidth=1,
+#             edgecolor="orange",
+#             fill=False,
+#         ))
 
 def draw_bboxes_conf(plot_ax, bboxes, confs,
     get_rectangle_corners_fn=get_rectangle_edges_from_pascal_bbox,
@@ -66,55 +55,31 @@ def draw_bboxes_conf(plot_ax, bboxes, confs,
             bottom_left,
             width,
             height,
-            linewidth=3,
+            linewidth=2,
             edgecolor="orange",
             fill=False,
         ))
         plot_ax.text(bottom_left[0]+0.5*width,y2,
-            str(conf)[0:4], fontsize=24,
+            str(conf)[0:4], fontsize=18,
         horizontalalignment='center',
         verticalalignment='top',color="orange")
 
 
-def get_img_drawn(image, bboxes_anot, predicted_bboxes, loss, size=20):
-    """
-        image = imagen del dataset a predecir/dibujar
-        bboxes_anot = anotaciones originales de la imagen en el dataset
-        predicted_bboxes = anotaciones predecidas por el modelo
-    """
-    # plt.figure()
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(size,size))
-    # fig.suptitle(title,fontsize=size*(3/2))
-    ax1.imshow(image)
-    ax1.set_title(f"Imagen predecida\nLoss={loss}",fontsize=size*(5/4))
-    ax2.imshow(image)
-    ax2.set_title("Imagen anotada",fontsize=size*(5/4))
-    draw_pascal_voc_bboxes(ax1, predicted_bboxes)
-    draw_pascal_voc_bboxes(ax2, bboxes_anot.tolist())
-    fig.canvas.draw()
-    image = Image.frombytes('RGB', 
-        fig.canvas.get_width_height(),fig.canvas.tostring_rgb())
-    plt.close()
-    return image
-
-# def draw_img(image, bboxes):
-#     fig, ax = plt.subplots()
-#     ax.imshow(image)
-#     draw_pascal_voc_bboxes(ax,bboxes)
-#     fig.canvas.draw()
-#     image = Image.frombytes('RGB', 
-#         fig.canvas.get_width_height(),fig.canvas.tostring_rgb())
-#     plt.close()
-#     return image
-
-# def draw_img(image, gt, bboxes, losses):
-#     fig, (ax1, ax2) = plt.subplots(1,2)
+# def get_img_drawn(image, bboxes_anot, predicted_bboxes, loss, size=20):
+#     """
+#         image = imagen del dataset a predecir/dibujar
+#         bboxes_anot = anotaciones originales de la imagen en el dataset
+#         predicted_bboxes = anotaciones predecidas por el modelo
+#     """
+#     # plt.figure()
+#     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(size,size))
+#     # fig.suptitle(title,fontsize=size*(3/2))
 #     ax1.imshow(image)
-#     # ax1.set_title(f"loss: {losses[0]}, box_loss: {losses[1]}")
+#     ax1.set_title(f"Imagen predecida\nLoss={loss}",fontsize=size*(5/4))
 #     ax2.imshow(image)
-#     ax2.set_title("Ground Truth (imagen anotada)")
-#     draw_pascal_voc_bboxes(ax1,bboxes)
-#     draw_pascal_voc_bboxes(ax2,gt)
+#     ax2.set_title("Imagen anotada",fontsize=size*(5/4))
+#     draw_pascal_voc_bboxes(ax1, predicted_bboxes)
+#     draw_pascal_voc_bboxes(ax2, bboxes_anot.tolist())
 #     fig.canvas.draw()
 #     image = Image.frombytes('RGB', 
 #         fig.canvas.get_width_height(),fig.canvas.tostring_rgb())
@@ -122,51 +87,31 @@ def get_img_drawn(image, bboxes_anot, predicted_bboxes, loss, size=20):
 #     return image
 
 def draw_image(image, bboxes, confs, name):
-    fig, ax = plt.subplots(figsize=(40,40))
+    fig, ax = plt.subplots(figsize=(20,20))
     ax.imshow(image)
     draw_bboxes_conf(ax,bboxes,confs)
-    plt.savefig(f"{name}.png", dpi=100)
-    # canvas = FigureCanvasAgg(fig)
-    # canvas.draw()
-    # img = Image.fromarray(np.asarray(canvas.buffer_rgba()))
-    # return img
+    plt.savefig(f"{name}.png")
+    plt.close(fig)
 
-# def draw_multipred(image, gt, bboxes, losses):
-#     """
-#     image: imagen a dibujar
-#     gt: bboxes de la imagen anotada (ground truth)
-#     bboxes: bboxes de la imagen predecida
-#     losses: lista de dicts con las loss y box_loss de cada pred
-#     """
-#     fig, (ax1, ax2) = plt.subplots(1,2)
+def draw_images(images, bboxes, confs, names):
+    fig, ax = plt.subplots(figsize=(20,20))
+    for image, bboxs, conf, names in zip(images, bboxes, confs, names):
+        draw_bboxes_conf(ax,bboxes,confs)
+        plt.savefig(f"{name}.png")
+    plt.close()
+
+# def set_fig(image, gts):
+#     fig, (ax1, ax2) = plt.subplots(1, 2)
 #     ax1.imshow(image)
+#     ax2.imshow(image)
+#     draw_pascal_voc_bboxes(ax2,gts)
+#     return fig, ax1, ax2
 
-
-def set_fig(image, gts):
-    fig, (ax1, ax2) = plt.subplots(1, 2)
-    ax1.imshow(image)
-    ax2.imshow(image)
-    draw_pascal_voc_bboxes(ax2,gts)
-    return fig, ax1, ax2
-
-def draw_bbox(bboxes, ax):
-    draw_pascal_voc_bboxes(ax,bboxes)
+# def draw_bbox(bboxes, ax):
+#     draw_pascal_voc_bboxes(ax,bboxes)
 
 def set_loss(ax,loss):
     ax.set_title(f"Loss: {loss[0]}, Box_loss: {loss[1]}")
-
-# def draw_img_mod(image,gts,bboxes,losses,color="orange"):
-#     fig, ax1, ax2 = set_fig(image,gts)
-#     ax1.set_xticks([])
-#     ax1.set_yticks([])
-#     ax2.set_xticks([])
-#     ax2.set_yticks([])
-#     draw_bbox(bboxes,ax1,color)
-#     set_loss(ax1,losses)
-#     fig.canvas.draw()
-#     image = Image.frombytes('RGB', 
-#         fig.canvas.get_width_height(),fig.canvas.tostring_rgb())
-#     return image
 
 def uniquify_name(name):
     """
@@ -186,33 +131,33 @@ def uniquify_dir(name):
     # os.mkdir(dirname.format(counter))
     return dirname.format(counter)
 
-def draw_img_mod(image,gts,bboxes,losses,name):
-    """
-    image : PIL Image
-    gts : array de bboxes anotadas
-    bboxes : lista de predicciones
-    losses : lista [loss, box_loss]
-    """
-    fig, ax1, ax2 = set_fig(image,gts)
-    ax1.set_xticks([])
-    ax1.set_yticks([])
-    ax2.set_xticks([])
-    ax2.set_yticks([])
-    draw_bbox(bboxes,ax1)
-    set_loss(ax1,losses)
-    plt.figsave(uniquify(name))
+# def draw_img_mod(image,gts,bboxes,losses,name):
+#     """
+#     image : PIL Image
+#     gts : array de bboxes anotadas
+#     bboxes : lista de predicciones
+#     losses : lista [loss, box_loss]
+#     """
+#     fig, ax1, ax2 = set_fig(image,gts)
+#     ax1.set_xticks([])
+#     ax1.set_yticks([])
+#     ax2.set_xticks([])
+#     ax2.set_yticks([])
+#     draw_bbox(bboxes,ax1)
+#     set_loss(ax1,losses)
+#     plt.figsave(uniquify(name))
 
-def draw_imgs(images,gts,bboxes,losses,names):
-    for i, image in enumerate(images):
-        drawn_image=draw_img_mod(image,gts[i],bboxes[i],losses[i],names[i])
+# def draw_imgs(images,gts,bboxes,losses,names):
+#     for i, image in enumerate(images):
+#         drawn_image=draw_img_mod(image,gts[i],bboxes[i],losses[i],names[i])
 
-def show_image(
-    image, bboxes=None, draw_bboxes_fn=draw_pascal_voc_bboxes, figsize=(10, 10)
-):
-    fig, ax = plt.subplots(1, figsize=figsize)
-    ax.imshow(image)
+# def show_image(
+#     image, bboxes=None, draw_bboxes_fn=draw_pascal_voc_bboxes, figsize=(10, 10)
+# ):
+#     fig, ax = plt.subplots(1, figsize=figsize)
+#     ax.imshow(image)
 
-    if bboxes is not None:
-        draw_bboxes_fn(ax, bboxes)
+#     if bboxes is not None:
+#         draw_bboxes_fn(ax, bboxes)
 
-    plt.show()
+#     plt.show()
