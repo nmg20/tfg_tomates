@@ -51,6 +51,20 @@ from pytorch_lightning import LightningModule
 
 from ensemble_boxes import ensemble_boxes_wbf
 
+def bbox_area(bbox):
+    return abs((bbox[2]-bbox[0])*(bbox[3]-bbox[1]))
+
+def bboxes_area(bboxes):
+    return [bbox_area(x) for x in bboxes]
+
+def save_sizes(bboxes, file):
+    for bbox in bboxes:
+        file.write(f"{bbox_area(bbox)}\n")
+
+def save_anots(bboxes, file):
+    for bbox in bboxes:
+        file.write(f"{bbox}\n")
+
 def run_wbf(predictions, image_size=512, iou_thr=0.44, skip_box_thr=0.43, weights=None):
     bboxes = []
     confidences = []
@@ -80,6 +94,7 @@ def run_wbf(predictions, image_size=512, iou_thr=0.44, skip_box_thr=0.43, weight
 class EfficientDetModel(LightningModule):
     def __init__(
         self,
+        data_file,
         num_classes=1,
         img_size=512,
         prediction_confidence_threshold=0.2,
@@ -101,7 +116,7 @@ class EfficientDetModel(LightningModule):
         self.inference_tfms = inference_transforms
         self.output_dir = output_dir
         Path(output_dir).mkdir(parents=True, exist_ok=True)
-        # self.metric = MAP()
+        self.data_file = data_file
 
     # @auto_move_data
     def forward(self, images, targets):
@@ -112,7 +127,11 @@ class EfficientDetModel(LightningModule):
 
     def training_step(self, batch, batch_idx):
         images, annotations, _, image_ids = batch
-
+        # self.data_file.write(f"Annotations [{batch_idx}]: {annotations['bbox'][0].cpu().numpy()}\n")
+        # self.data_file.write(f"Areas: {bboxes_area(annotations['bbox'][0].cpu().numpy())}\n\n")
+        if self.data_file :
+            # save_sizes(annotations['bbox'][0].cpu().numpy(), self.data_file)
+            save_anots(annotations['bbox'][0].cpu().numpy(), self.data_file)
         losses = self.model(images, annotations)
 
         logging_losses = {
@@ -131,7 +150,6 @@ class EfficientDetModel(LightningModule):
     def validation_step(self, batch, batch_idx):
         images, annotations, targets, image_ids = batch
         outputs = self.model(images, annotations)
-
         detections = outputs["detections"]
 
         batch_predictions = {
