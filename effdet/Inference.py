@@ -67,19 +67,27 @@ def get_dir_imgs_names(imgs_dir=data_dir):
 #     union = area_a + area_b - inter
 #     return inter / union  # [A,B]
 
-def bbox_area(bbox):
-    return (bbox[2]-bbox[0])*(bbox[3]-bbox[1])
+def file_to_bboxes(file):
+    f = open(file,"r")
+    return [[float(x) for x in bbox.split(" ") if len(x)>1] for bbox in f.read().strip().replace("[","").replace("]","").split("\n")]
 
-def save_hist(data, name, bboxes=False):
+def bbox_area(bbox):
+    return abs((bbox[2]-bbox[0])*(bbox[3]-bbox[1]))
+
+def save_hist(data, name, nbins, bboxes=False):
     """
     Recibe una lista anidada (confianzas de las predicciones o los
     bounding boxes), la aplana, dibuja su histograma y lo guarda.
     """
-    data = [item for sublist in data for item in sublist]
+    # data = [item for sublist in data for item in sublist]
     if bboxes==True:
         data = [bbox_area(x) for x in data]
     fig, ax = plt.subplots(figsize=(20,20))
-    plt.hist(data)
+    if not nbins:
+        bins=np.linspace(min(data),max(data))
+    else:
+        bins = list(range(0,max(data),nbins))
+    plt.hist(data, bins)
     plt.savefig(name)
     plt.close()
 
@@ -94,7 +102,6 @@ def read_imageset_names(ds="d801010"):
     file = open(imagesets_dir+ds+"/test.txt")
     names = [x+".jpg" for x in file.read().split("\n")[::-1]]
     return names[0:44]
-
 
 def inferencev1(model,data_dir=data_dir,output_dir=output_dir):
     """
@@ -141,31 +148,3 @@ def inference(model_name="d801010",version=2):
         inferencev2(load_model(model_name),model_name)
     else:
         inferencev1(load_model(model_name))
-
-"""
-data_ds = get_data_ds(get_dir_imgs_names())
-model=get_model()
-load_ex_model(model,"d801010")
-model.eval()
-#imgs,anots = map(list,zip(*data_ds.get_imgs_and_anots()))
-imgs, anots = [i for i,_,_,_ in data_ds.get_imgs_and_anots()],[i for _,i,_,_ in data_ds.get_imgs_and_anots()]
-bboxes,_,confs = model.predict(imgs)
-bboxes = simplify_bboxes(bboxes)
-
-
-"""
-
-
-
-
-# def inference(model,imgs,output_dir=None):
-#     """
-#     Si se le pasa un rango, coge las imágenes de imgs_dir en ese rango.
-#     Se le pueden pasar también imágenes (PIL).
-#     """
-#     output_dir = preds_dir+output_dir
-#     if imgs==[]:
-#         imgs = [Image.open(x) for x in os.listdir(data_dir)]
-#     model.eval()
-#     bboxes, _, _ = model.predict(imgs)
-#     save_preds(imgs,bboxes,output_dir)
