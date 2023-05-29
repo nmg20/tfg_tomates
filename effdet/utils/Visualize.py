@@ -86,10 +86,11 @@ def draw_bboxes_conf(plot_ax, bboxes, confs,
 #     plt.close()
 #     return image
 
-def draw_image(image, bboxes, confs, name):
+def draw_image(image, bboxes, confs, loss, name):
     fig, ax = plt.subplots(figsize=(20,20))
     ax.imshow(image)
     draw_bboxes_conf(ax,bboxes,confs)
+    plt.title(f"Loss: {loss}")
     plt.savefig(f"{name}.png")
     plt.close(fig)
 
