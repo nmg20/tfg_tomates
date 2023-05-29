@@ -8,12 +8,16 @@ from utils.Visualize import *
 
 datasets_dir = "/media/rtx3090/Disco2TB/cvazquez/nico/datasets/"
 main_ds = "/media/rtx3090/Disco2TB/cvazquez/nico/datasets/Tomato_1280x720/"
+data_dir = os.path.abspath("./data/")
 
 from pathlib import Path
 
 def read_anots(image):
     df = pd.read_csv(main_ds+"/ImageSets/all_annotations.csv")
     return df[df.image==image.filename.split("/")[-1]][["xmin", "ymin", "xmax", "ymax"]].values
+
+def get_dir_imgs_names(imgs_dir=data_dir):
+    return [x for x in os.listdir(imgs_dir) if x[len(x)-4::]=='.jpg']
 
 class TomatoDatasetAdaptor:
     def __init__(self, images_dir_path, annotations_dataframe):
@@ -52,6 +56,15 @@ class TomatoDatasetAdaptor:
         print(f"image_id: {image_id}")
         show_image(image, bboxes.tolist())
         print(class_labels)
+
+class TomatoDatasetPredAdaptor:
+    def __init__(self, images_dir_path):
+        self.images_dir_path = Path(images_dir_path)
+
+    def get_image_by_idx(self, index):
+        image_name = self.images[index]
+        image = Image.open(self.images_dir_path / image_name)
+        return image
 
 
 from torch.utils.data import Dataset
@@ -102,6 +115,19 @@ def get_test_transforms(target_img_size=512):
             # transforms.ColorJitter(contrast=0.2),
             # transforms.ColorJitter(saturation=0.3),
             # transforms.Equalize(mode='pil',by_channels=True),
+            A.Resize(height=target_img_size, width=target_img_size, p=1),
+            A.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+            ToTensorV2(p=1),
+        ],
+        p=1.0,
+        bbox_params=A.BboxParams(
+            format="pascal_voc", min_area=0, min_visibility=0, label_fields=["labels"]
+        ),
+    )
+
+def get_pred_transforms(target_img_size=512):
+    return A.Compose(
+        [
             A.Resize(height=target_img_size, width=target_img_size, p=1),
             A.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
             ToTensorV2(p=1),
@@ -166,18 +192,22 @@ class EfficientDetDataModule(LightningDataModule):
                 train_dataset_adaptor,
                 validation_dataset_adaptor,
                 test_dataset_adaptor,
+                pred_dataset_adaptor,
                 train_transforms=get_train_transforms(target_img_size=512),
                 valid_transforms=get_valid_transforms(target_img_size=512),
                 test_transforms=get_test_transforms(target_img_size=512),
+                pred_transforms=get_pred_transforms(target_img_size=512),
                 num_workers=8,
                 batch_size=4):
         
         self.train_ds = train_dataset_adaptor
         self.valid_ds = validation_dataset_adaptor
         self.test_ds = test_dataset_adaptor
+        self.pred_ds = pred_dataset_adaptor
         self.train_tfms = train_transforms
         self.valid_tfms = valid_transforms
         self.test_tfms = test_transforms
+        self.pred_tfms = pred_transforms
         self.num_workers = num_workers
         self.batch_size = batch_size
         super().__init__()
@@ -236,6 +266,24 @@ class EfficientDetDataModule(LightningDataModule):
             collate_fn=self.collate_fn,
         )
         return test_loader
+
+    def pred_dataset(self) -> EfficientDetDataset:
+        return EfficientDetDataset(
+            dataset_adaptor=self.pred_ds, transforms=self.pred_tfms
+        )
+
+    def pred_dataloader(self) -> DataLoader:
+        pred_dataset = self.pred_dataset()
+        pred_loader = torch.utils.data.DataLoader(
+            pred_dataset,
+            batch_size=1,
+            shuffle=False,
+            pin_memory=True,
+            drop_last=False,
+            num_workers=self.num_workers,
+            collate_fn=self.collate_fn,
+        )
+        return pred_loader
     
     @staticmethod
     def collate_fn(batch):
@@ -270,16 +318,18 @@ def load_dss(path,name):
     val_ds = TomatoDatasetAdaptor(images_path, df_vl)
     return train_ds, test_ds, val_ds
 
-def get_dm(train,val,test):
+def get_dm(train,val,test,pred):
     return EfficientDetDataModule(train_dataset_adaptor=train, 
         validation_dataset_adaptor=val,
         test_dataset_adaptor=test,
+        pred_dataset_adaptor=pred,
         num_workers=4,
         batch_size=2)
 
-def get_dm_standalone(path,name):
+def get_dm_standalone(path=main_ds,name="d801010", data_dir=None):
     train, test, val = load_dss(path,name)
-    return get_dm(train,val,test)
+    pred = get_data_ds(get_dir_imgs_names(data_dir))
+    return get_dm(train,val,test,pred)
 
 def get_dm2(name):
     train,test,val=load_dss(main_ds,name)
@@ -319,3 +369,5 @@ def get_data_ds(names, path=main_ds):
     main_df = get_main_df()
     df = get_data_df(main_df,names)
     return TomatoDatasetAdaptor(dataset_path/"JPEGImages",df)
+
+

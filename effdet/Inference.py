@@ -6,6 +6,7 @@ from utils.Visualize import uniquify_dir, draw_image
 import os
 import argparse
 from torch.nn import CrossEntropyLoss as CE
+from torchvision.transforms import Compose, ToPILImage, PILToTensor
 
 preds_dir = "./preds/"
 imagesets_dir = "../../datasets/Tomato_1280x720/ImageSets/"
@@ -103,6 +104,13 @@ def read_imageset_names(ds="d801010"):
     names = [x+".jpg" for x in file.read().split("\n")[::-1]]
     return names[0:44]
 
+def calculate_loss(anots,bboxes):
+    losses = []
+    anots, bboxes = [torch.tensor(x) for x in anots], [torch.tensor(x) for x in bboxes]
+    for i in len(anots):
+        losses.append()
+
+
 def inferencev1(model,data_dir=data_dir,output_dir=output_dir):
     """
     A partir de un directorio crea un ds ad-hoc, lee de un fichero maestro
@@ -132,16 +140,27 @@ def inferencev2(model,ds="d801010",output_dir=output_dir):
     output=Path(uniquify_dir(output_dir+"/run"))
     os.mkdir(output)
     data_ds = get_data_ds(read_imageset_names(ds))
+    # data_ds = get_data_ds(read_imageset_names("d801010"))
     model.eval()
     images, anots = [i for i,_,_,_ in data_ds.get_imgs_and_anots()],[i for _,i,_,_ in data_ds.get_imgs_and_anots()]
-    bboxes,_,confs = model.predict(images)
+    bboxes,_,confs, loss = model.predict(images)
     save_hist(bboxes,str(output)+f"/areas_histogram_{ds}.png",True)
     save_hist(confs,str(output)+f"/confidences_histogram_{ds}.png",False)
-    for image, bbox, conf in zip(images, bboxes, confs):
+    for image, bbox, conf in zip(images, bboxes, losses, confs):
         name = str(output)+"/"+image.filename.split("/")[-1].split(".")[0]
-        draw_image(image, bbox, conf, name)
+        draw_image(image, bbox, conf, loss, name)
     # names = [str(output)+"/"+image.filename.split("/")[-1].split(".")[0] for image in images]
     # draw_images(images, bboxes, confs, names)
+
+def imgs_to_tensor(images):
+    tf = Compose([PILToTensor()])
+    return [tf(x) for x in images]
+
+def inf(model,ds="d801010",output_dir=output_dir):
+    output=Path(uniquify_dir(output_dir+"/run"))
+    os.mkdir(output)
+    data_ds = get_data_ds(read_imageset_names(ds))
+    model.eval()
 
 def inference(model_name="d801010",version=2):
     if version==2:

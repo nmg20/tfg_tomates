@@ -38,9 +38,10 @@ import logging
 import numpy as np
 import torch
 import torch.nn.functional as F
+from torch.nn import CrossEntropyLoss as CE
 from PIL import Image
 
-from torchvision.transforms import ToPILImage
+from torchvision.transforms import Compose, ToPILImage, PILToTensor
 
 from torchvision.ops import box_iou
 from sklearn.metrics import average_precision_score
@@ -64,6 +65,20 @@ def save_sizes(bboxes, file):
 def save_anots(bboxes, file):
     for bbox in bboxes:
         file.write(f"{bbox}\n")
+
+def images_to_tensor(images, transform=get_valid_transforms(512)):
+    image_sizes = [(image.size[1], image.size[0]) for image in images]
+    return torch.stack(
+        [
+            transform(
+                image=np.array(image, dtype=np.float32),
+                labels=np.ones(1),
+                bboxes=np.array([[0, 0, 1, 1]]),
+            )["image"]
+            for image in images
+        ]
+    ), image_sizes
+
 
 def run_wbf(predictions, image_size=512, iou_thr=0.44, skip_box_thr=0.43, weights=None):
     bboxes = []
@@ -90,11 +105,9 @@ def run_wbf(predictions, image_size=512, iou_thr=0.44, skip_box_thr=0.43, weight
 
     return bboxes, confidences, class_labels
 
-
 class EfficientDetModel(LightningModule):
     def __init__(
         self,
-        data_file,
         num_classes=1,
         img_size=512,
         prediction_confidence_threshold=0.2,
@@ -102,7 +115,8 @@ class EfficientDetModel(LightningModule):
         wbf_iou_threshold=0.44,
         inference_transforms=get_valid_transforms(target_img_size=512),
         model_architecture='tf_efficientnetv2_l',
-        output_dir="./outputs/"
+        output_dir="./outputs/",
+        # data_file=None,
     ):
         super().__init__()
         self.img_size = img_size
@@ -116,9 +130,15 @@ class EfficientDetModel(LightningModule):
         self.inference_tfms = inference_transforms
         self.output_dir = output_dir
         Path(output_dir).mkdir(parents=True, exist_ok=True)
-        self.data_file = data_file
+        # self.data_file = data_file
 
     # @auto_move_data
+    # def forward(self, images, targets):
+    #     output = self.model(images, targets)
+    #     loss = 0
+    #     if targets:
+    #         loss = CE(output, targets)
+    #     return loss, output
     def forward(self, images, targets):
         return self.model(images, targets)
 
@@ -127,11 +147,9 @@ class EfficientDetModel(LightningModule):
 
     def training_step(self, batch, batch_idx):
         images, annotations, _, image_ids = batch
-        # self.data_file.write(f"Annotations [{batch_idx}]: {annotations['bbox'][0].cpu().numpy()}\n")
-        # self.data_file.write(f"Areas: {bboxes_area(annotations['bbox'][0].cpu().numpy())}\n\n")
-        if self.data_file :
+        # if self.data_file :
             # save_sizes(annotations['bbox'][0].cpu().numpy(), self.data_file)
-            save_anots(annotations['bbox'][0].cpu().numpy(), self.data_file)
+            # save_anots(annotations['bbox'][0].cpu().numpy(), self.data_file)
         losses = self.model(images, annotations)
 
         logging_losses = {
@@ -175,8 +193,6 @@ class EfficientDetModel(LightningModule):
         image, annotations, targets, image_ids = batch
         outputs = self.model(image, annotations)
         detections = outputs["detections"]
-        # print(f"Anots: {len(annotations[0])}\n")
-        # print(f"Detections: {len(detections[0])}\n")
 
         batch_predictions = {
             "predictions": detections,
@@ -184,8 +200,6 @@ class EfficientDetModel(LightningModule):
             "image_ids": image_ids,
         }
         losses = [outputs["loss"],outputs["box_loss"]]
-        # print("\n\nPreds: ",detections.squeeze(0).cpu().numpy())
-
         logging_losses = {"box_loss": outputs["box_loss"].detach(),}
 
         self.log("test_loss", outputs["loss"], on_step=True, on_epoch=True, prog_bar=True,
@@ -195,7 +209,7 @@ class EfficientDetModel(LightningModule):
         return {'loss': outputs["loss"], 'batch_predictions': batch_predictions}
 
     @typedispatch
-    def predict(self, images: List):
+    def predict(self, images: List, bboxes : torch.Tensor):
         """
         For making predictions from images
         Args:
@@ -204,19 +218,8 @@ class EfficientDetModel(LightningModule):
         Returns: a tuple of lists containing bboxes, predicted_class_labels, predicted_class_confidences
 
         """
-        image_sizes = [(image.size[1], image.size[0]) for image in images]
-        images_tensor = torch.stack(
-            [
-                self.inference_tfms(
-                    image=np.array(image, dtype=np.float32),
-                    labels=np.ones(1),
-                    bboxes=np.array([[0, 0, 1, 1]]),
-                )["image"]
-                for image in images
-            ]
-        )
-
-        return self._run_inference(images_tensor, image_sizes)
+        images_tensor, images_sizes = images_to_tensor(images)
+        return self._run_inference(images_tensor, images_sizes, bboxes)
 
     @typedispatch
     def predict(self, images_tensor: torch.Tensor):
@@ -243,12 +246,14 @@ class EfficientDetModel(LightningModule):
 
         return self._run_inference(images_tensor, image_sizes)
 
-    def _run_inference(self, images_tensor, image_sizes):
-        dummy_targets = self._create_dummy_inference_targets(
-            num_images=images_tensor.shape[0]
-        )
-
-        detections = self.model(images_tensor.to(self.device), dummy_targets)[
+    def _run_inference(self, images_tensor, image_sizes, bboxes=None):
+        targets = self._create_dummy_inference_targets(
+            num_images=images_tensor.shape[0], bboxes=bboxes
+            )
+        results = self.model(images_tensor.to(self.device), targets)
+        loss = results['loss']
+        print(f"\nLOSS: {results['loss']}\n\n")
+        detections = results[
             "detections"
         ]
         (
@@ -262,14 +267,19 @@ class EfficientDetModel(LightningModule):
         )
         # print(scaled_bboxes)
 
-        return scaled_bboxes, predicted_class_labels, predicted_class_confidences
+        return scaled_bboxes, predicted_class_labels, predicted_class_confidences, loss
     
-    def _create_dummy_inference_targets(self, num_images):
-        dummy_targets = {
-            "bbox": [
-                torch.tensor([[0.0, 0.0, 0.0, 0.0]], device=self.device)
+    def _create_dummy_inference_targets(self, num_images, bboxes=None):
+        """
+        Bboxes como lista de anotaciones
+        """
+        if bboxes==None:
+            bboxes = [torch.tensor([[0.0, 0.0, 0.0, 0.0]], device=self.device)
                 for i in range(num_images)
-            ],
+            ]
+
+        dummy_targets = {
+            "bbox": bboxes,
             "cls": [torch.tensor([1.0], device=self.device) for i in range(num_images)],
             "img_size": torch.tensor(
                 [(self.img_size, self.img_size)] * num_images, device=self.device
@@ -322,6 +332,17 @@ class EfficientDetModel(LightningModule):
                 scaled_bboxes.append(bboxes)
 
         return scaled_bboxes
+
+    @torch.no_grad()
+    def prediction_step(self, batch, batch_idx):
+        image, annotations, target, image_ids = batch
+        # bboxes,_,_,loss = self.model.predict([image],target[0]['bboxes'])
+        # print(f"Bboxes: {bboxes}\n\tLoss: {loss}\n")
+        output = self.model(image,target)
+        self.log("loss",loss, on_step=True, on_epoch=True, prog_bar=True,
+            logger=True, sync_dist=True)
+        print("Output: "+output)
+        return {'loss': loss}
 
 from fastcore.basics import patch
 
@@ -441,47 +462,10 @@ def get_model():
 def load_checkpoint(path):
     return EfficientDetModel.load_from_checkpoint(path)
 
-def load_model(path):
+def load_model(path="d801010"):
     model = EfficientDetModel(num_classes=1, img_size=512)
     model.load_state_dict(torch.load(models_path+"/"+path+".pt"))
     return model
 
 def load_ex_model(model, path):
     model.load_state_dict(torch.load(models_path+"/"+path+".pt"))
-
-# def get_batch(model,ds,i):
-#     img, anots, 
-
-# def get_imgs_anots_preds(model,ds,i,j):
-#     imgs,anots = [],[]
-#     for k in list(range(i,j)):
-#         img, anot,_,_ = ds.get_image_and_labels_by_idx(k)
-#         imgs.append(img)
-#         anots.append(anot)
-#     pred, _, _ = model.predict(imgs)
-#     return imgs,anots,pred
-
-# def get_preds(model,ds,i,j):
-#     imgs, anots, preds = get_imgs_anots_preds(model,ds,i,j)
-#     pred_imgs = []
-#     for k in list(range(len(imgs))):
-#         pred_imgs.append(get_img_drawn(imgs[k],anots[k],preds[k]))
-#     return pred_imgs
-
-# def get_pred(model, ds, i):
-#     img, box, _, _ = ds.get_image_and_labels_by_idx(i)
-#     pred, _ ,_ = model.predict([img])
-#     plt.figure()
-#     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(30,30))
-#     ax1.imshow(img)
-#     ax1.set_title("Predicción")
-#     ax2.imshow(img)
-#     ax2.set_title("Anotada")
-#     draw_pascal_voc_bboxes(ax1, pred[0])
-#     draw_pascal_voc_bboxes(ax2, box.tolist())
-#     # plt.savefig(path+Path(imgs[i].filename).name)
-#     fig.canvas.draw()
-#     image = Image.frombytes('RGB', 
-#     fig.canvas.get_width_height(),fig.canvas.tostring_rgb())
-#     plt.close("all")
-#     return image
