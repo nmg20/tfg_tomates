@@ -2,7 +2,7 @@ from pathlib import Path
 import pandas as pd
 from EffDetDataset import *
 from Model import *
-from utils.Visualize import uniquify_dir, draw_image
+from utils.Visualize import uniquify_dir, draw_images
 import os
 import argparse
 from torch.nn import CrossEntropyLoss as CE
@@ -104,66 +104,56 @@ def read_imageset_names(ds="d801010"):
     names = [x+".jpg" for x in file.read().split("\n")[::-1]]
     return names[0:44]
 
-def calculate_loss(anots,bboxes):
-    losses = []
-    anots, bboxes = [torch.tensor(x) for x in anots], [torch.tensor(x) for x in bboxes]
-    for i in len(anots):
-        losses.append()
+# def inferencev2(model,ds="d801010",output_dir=output_dir):
+#     """
+#     Versión con una ruta a un ImageSet en lugar de leer los nombres
+#     de los ficheros en el directorio /data.
+#     """
+#     output=Path(uniquify_dir(output_dir+"/run"))
+#     os.mkdir(output)
+#     data_ds = get_data_ds(read_imageset_names(ds))
+#     # data_ds = get_data_ds(read_imageset_names("d801010"))
+#     model.eval()
+#     images, anots = [i for i,_,_,_ in data_ds.get_imgs_and_anots()],[i for _,i,_,_ in data_ds.get_imgs_and_anots()]
+#     bboxes,_,confs, loss = model.predict(images)
+#     save_hist(bboxes,str(output)+f"/areas_histogram_{ds}.png",True)
+#     save_hist(confs,str(output)+f"/confidences_histogram_{ds}.png",False)
+#     for image, bbox, conf in zip(images, bboxes, losses, confs):
+#         name = str(output)+"/"+image.filename.split("/")[-1].split(".")[0]
+#         draw_image(image, bbox, conf, loss, name)
+#     # names = [str(output)+"/"+image.filename.split("/")[-1].split(".")[0] for image in images]
+#     # draw_images(images, bboxes, confs, names)
+
+# def imgs_to_tensor(images):
+#     tf = Compose([PILToTensor()])
+#     return [tf(x) for x in images]
+
+# def inf(model,ds="d801010",output_dir=output_dir):
+#     output=Path(uniquify_dir(output_dir+"/run"))
+#     os.mkdir(output)
+#     data_ds = get_data_ds(read_imageset_names(ds))
+#     model.eval()
 
 
-def inferencev1(model,data_dir=data_dir,output_dir=output_dir):
-    """
-    A partir de un directorio crea un ds ad-hoc, lee de un fichero maestro
-    las anotaciones, infiere los resultados y os vuelca en un directorio "output_dir".
-    Las imágenes necesitan pertenecer a la base de datos de imágenes del modelo,
-    sino no se podría calcular la loss de las predicciones.
-    """
-    # Output_dir con un dir /runx (x=número único -> uniquify)
+def inference_step(model, batch, output, num, compare):
+    image, anns, _, _ = batch
+    pred_bboxes, pred_cls, pred_confs, loss = model.predict(image)
+    draw_images(image, pred_bboxes, pred_confs, loss, f"predicted_img_{num}.png",anns)
+
+def inference(name, compare):
+    model = load_model(name)
     output=Path(uniquify_dir(output_dir+"/run"))
     os.mkdir(output)
-    data_ds = get_data_ds(get_dir_imgs_names())
+    dm = get_dm_standalone(data_dir=data_dir,batch_size=1)
+    dl = iter(dm.pred_dataloader())
+    num = 0
     model.eval()
-    images, anots = [i for i,_,_,_ in data_ds.get_imgs_and_anots()],[i for _,i,_,_ in data_ds.get_imgs_and_anots()]
-    bboxes,_,confs = model.predict(images)
-    # bboxes = simplify_bboxes(bboxes)
-    save_hist(bboxes,str(output)+"/areas_histogram.png",True)
-    save_hist(confs,str(output)+"/confidences_histogram.png",False)
-    for image, bbox, conf in zip(images, bboxes, confs):
-        name = str(output)+"/"+image.filename.split("/")[-1].split(".")[0]
-        draw_image(image, bbox, conf, name)
-
-def inferencev2(model,ds="d801010",output_dir=output_dir):
-    """
-    Versión con una ruta a un ImageSet en lugar de leer los nombres
-    de los ficheros en el directorio /data.
-    """
-    output=Path(uniquify_dir(output_dir+"/run"))
-    os.mkdir(output)
-    data_ds = get_data_ds(read_imageset_names(ds))
-    # data_ds = get_data_ds(read_imageset_names("d801010"))
-    model.eval()
-    images, anots = [i for i,_,_,_ in data_ds.get_imgs_and_anots()],[i for _,i,_,_ in data_ds.get_imgs_and_anots()]
-    bboxes,_,confs, loss = model.predict(images)
-    save_hist(bboxes,str(output)+f"/areas_histogram_{ds}.png",True)
-    save_hist(confs,str(output)+f"/confidences_histogram_{ds}.png",False)
-    for image, bbox, conf in zip(images, bboxes, losses, confs):
-        name = str(output)+"/"+image.filename.split("/")[-1].split(".")[0]
-        draw_image(image, bbox, conf, loss, name)
-    # names = [str(output)+"/"+image.filename.split("/")[-1].split(".")[0] for image in images]
-    # draw_images(images, bboxes, confs, names)
-
-def imgs_to_tensor(images):
-    tf = Compose([PILToTensor()])
-    return [tf(x) for x in images]
-
-def inf(model,ds="d801010",output_dir=output_dir):
-    output=Path(uniquify_dir(output_dir+"/run"))
-    os.mkdir(output)
-    data_ds = get_data_ds(read_imageset_names(ds))
-    model.eval()
-
-def inference(model_name="d801010",version=2):
-    if version==2:
-        inferencev2(load_model(model_name),model_name)
-    else:
-        inferencev1(load_model(model_name))
+    try:
+        while True:
+            batch = next(dl)
+            inference_step(model, batch, output, num, compare)
+            num = num + 1
+    except StopIteration:
+        pass
+    finally:
+        del dl
