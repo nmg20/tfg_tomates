@@ -209,7 +209,7 @@ class EfficientDetModel(LightningModule):
         return {'loss': outputs["loss"], 'batch_predictions': batch_predictions}
 
     @typedispatch
-    def predict(self, images: List, bboxes : torch.Tensor):
+    def predict(self, images: List):
         """
         For making predictions from images
         Args:
@@ -219,7 +219,7 @@ class EfficientDetModel(LightningModule):
 
         """
         images_tensor, images_sizes = images_to_tensor(images)
-        return self._run_inference(images_tensor, images_sizes, bboxes)
+        return self._run_inference(images_tensor, images_sizes)
 
     @typedispatch
     def predict(self, images_tensor: torch.Tensor):
@@ -246,13 +246,13 @@ class EfficientDetModel(LightningModule):
 
         return self._run_inference(images_tensor, image_sizes)
 
-    def _run_inference(self, images_tensor, image_sizes, bboxes=None):
+    def _run_inference(self, images_tensor, image_sizes):
         targets = self._create_dummy_inference_targets(
-            num_images=images_tensor.shape[0], bboxes=bboxes
+            num_images=images_tensor.shape[0]
             )
         results = self.model(images_tensor.to(self.device), targets)
         loss = results['loss']
-        print(f"\nLOSS: {results['loss']}\n\n")
+        # print(f"LOSS: {results['loss']}")
         detections = results[
             "detections"
         ]
@@ -270,16 +270,10 @@ class EfficientDetModel(LightningModule):
         return scaled_bboxes, predicted_class_labels, predicted_class_confidences, loss
     
     def _create_dummy_inference_targets(self, num_images, bboxes=None):
-        """
-        Bboxes como lista de anotaciones
-        """
-        if bboxes==None:
-            bboxes = [torch.tensor([[0.0, 0.0, 0.0, 0.0]], device=self.device)
-                for i in range(num_images)
-            ]
-
         dummy_targets = {
-            "bbox": bboxes,
+            "bbox": [torch.tensor([[0.0, 0.0, 0.0, 0.0]], device=self.device)
+                for i in range(num_images)
+            ],
             "cls": [torch.tensor([1.0], device=self.device) for i in range(num_images)],
             "img_size": torch.tensor(
                 [(self.img_size, self.img_size)] * num_images, device=self.device
@@ -333,16 +327,27 @@ class EfficientDetModel(LightningModule):
 
         return scaled_bboxes
 
+    # @torch.no_grad()
+    # def prediction_step(self, batch, batch_idx):
+    #     image, annotations, target, image_ids = batch
+    #     # bboxes,_,_,loss = self.model.predict([image],target[0]['bboxes'])
+    #     # print(f"Bboxes: {bboxes}\n\tLoss: {loss}\n")
+    #     # output = self.model(image,annotations)
+    #     output = self.model(image,annotations)
+    #     self.log("loss",loss, on_step=True, on_epoch=True, prog_bar=True,
+    #         logger=True, sync_dist=True)
+    #     print("Output: "+output)
+    #     return {'loss': loss}
+
     @torch.no_grad()
-    def prediction_step(self, batch, batch_idx):
-        image, annotations, target, image_ids = batch
-        # bboxes,_,_,loss = self.model.predict([image],target[0]['bboxes'])
-        # print(f"Bboxes: {bboxes}\n\tLoss: {loss}\n")
-        output = self.model(image,target)
-        self.log("loss",loss, on_step=True, on_epoch=True, prog_bar=True,
-            logger=True, sync_dist=True)
-        print("Output: "+output)
-        return {'loss': loss}
+    def predict_step(self, batch, batch_idx):
+        images, annotations, target, image_ids = batch
+        pred_bboxes, pred_classes, pred_confs, loss = self.model.predict(images)
+        self.log("prediction_loss", loss, on_step=True, on_epoch=True, prog_bar=True,
+                 logger=True, sync_dist=True)
+        return {'loss': loss, 'batch_predictions': pred_bboxes}
+
+
 
 from fastcore.basics import patch
 

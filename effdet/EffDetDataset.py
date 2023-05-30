@@ -318,22 +318,22 @@ def load_dss(path,name):
     val_ds = TomatoDatasetAdaptor(images_path, df_vl)
     return train_ds, test_ds, val_ds
 
-def get_dm(train,val,test,pred):
+def get_dm(train,val,test,pred,batch_size=2):
     return EfficientDetDataModule(train_dataset_adaptor=train, 
         validation_dataset_adaptor=val,
         test_dataset_adaptor=test,
         pred_dataset_adaptor=pred,
         num_workers=4,
-        batch_size=2)
+        batch_size=batch_size)
 
-def get_dm_standalone(path=main_ds,name="d801010", data_dir=None):
+def get_dm_standalone(path=main_ds,name="d801010", data_dir=None, batch_size=1):
     train, test, val = load_dss(path,name)
     pred = get_data_ds(get_dir_imgs_names(data_dir))
-    return get_dm(train,val,test,pred)
+    return get_dm(train,val,test,pred,batch_size)
 
 def get_dm2(name):
     train,test,val=load_dss(main_ds,name)
-    return get_dm(train,val,test)
+    return get_dm(train,val,test,2)
 
 def get_dms_dss(dm):
     return dm.train_ds,dm.valid_ds,dm.test_ds
