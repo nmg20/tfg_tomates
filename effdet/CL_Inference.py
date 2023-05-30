@@ -26,14 +26,10 @@ def dir_path(path):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-m', '--model', type=str, help="Número de épocas de entrenamiento.")
-    # parser.add_argument('-o','--output',type=dir_path, help="Directorio del dataset a partir del que crear el dataframe.")
-    parser.add_argument('-v','--version',type=int, help="Directorio del dataset a partir del que crear el dataframe.")
-
+    parser.add_argument('-c', '--compare', default=False, action='store_true')
+    
     args = parser.parse_args()
-    # output_dir = preds_dir if len(args.output)==1 else args.output
-    # model = load_model(args.model)
-    # imgs = get_dir_imgs(data_dir)
-    inference(args.model,args.version)
+    inference(args.model, args.compare)
 
 if __name__=="__main__":
     main()
