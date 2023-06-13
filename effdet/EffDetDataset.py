@@ -8,6 +8,8 @@ from utils.Visualize import *
 
 datasets_dir = "/media/rtx3090/Disco2TB/cvazquez/nico/datasets/"
 main_ds = "/media/rtx3090/Disco2TB/cvazquez/nico/datasets/Tomato_1280x720/"
+images_dir = "../../datasets/Tomato_1280x720/JPEGImages/"
+imagesets_dir = "../../datasets/Tomato_1280x720/ImageSets/"
 data_dir = os.path.abspath("./data/")
 
 from pathlib import Path
@@ -18,6 +20,15 @@ def read_anots(image):
 
 def get_dir_imgs_names(imgs_dir=data_dir):
     return [x for x in os.listdir(imgs_dir) if x[len(x)-4::]=='.jpg']
+
+def read_imageset_names(ds="d801010",file="test.txt"):
+    """
+    Lee del set de imágenes de un dataset los nombres para emular que 
+    se encuentran en la carpeta /data.
+    """
+    file = open(file)
+    names = [x+".jpg" for x in file.read().split("\n")[::-1]]
+    return names
 
 class TomatoDatasetAdaptor:
     def __init__(self, images_dir_path, annotations_dataframe):
@@ -37,19 +48,8 @@ class TomatoDatasetAdaptor:
         class_labels = np.ones(len(pascal_bboxes))
 
         return image, pascal_bboxes, class_labels, index
-
-    # def get_annots_of_img(self, image):
-    #     return self.annotations_df[self.annotations_df.image==image][
-    #         ["xmin","ymin","xmax","ymax"]].values
-
-    # def get_anots_array(self):
-    #     return self.annotations_df[["xmin","ymin","xmax","ymax"]].values
-
     def get_imgs_and_anots(self):
         return [self.get_image_and_labels_by_idx(i) for i in range(len(self.images))]    
-
-    # def get_imgs(self):
-    #     return [Image.open(Path(self.images_dir_path/x)) for x in self.images]
 
     def show_image(self, index):
         image, bboxes, class_labels, image_id = self.get_image_and_labels_by_idx(index)
@@ -71,6 +71,15 @@ from torch.utils.data import Dataset
 import albumentations as A
 from albumentations.pytorch.transforms import ToTensorV2
 from albumentations.augmentations import transforms
+import torchvision.transforms as tfs
+
+mean = [0.485, 0.456, 0.406]
+std = [0.229, 0.224, 0.225]
+
+def denormalize(tensor):
+    z = tensor * torch.tensor(std).view(3,1,1)
+    z = z + torch.tensor(mean).view(3,1,1)
+    return tfs.ToPILImage(mode="RGB")(z.squeeze(0))
 
 def get_train_transforms(target_img_size=512):
     return A.Compose(
@@ -81,7 +90,7 @@ def get_train_transforms(target_img_size=512):
             # transforms.ColorJitter(saturation=0.3),
             # transforms.Equalize(mode='pil',by_channels=True),
             A.Resize(height=target_img_size, width=target_img_size, p=1),
-            A.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+            A.Normalize(mean, std),
             ToTensorV2(p=1),
         ],
         p=1.0,
@@ -99,7 +108,7 @@ def get_valid_transforms(target_img_size=512):
             # transforms.ColorJitter(saturation=0.3),
             # transforms.Equalize(mode='pil',by_channels=True),
             A.Resize(height=target_img_size, width=target_img_size, p=1),
-            A.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+            A.Normalize(mean, std),
             ToTensorV2(p=1),
         ],
         p=1.0,
@@ -116,7 +125,7 @@ def get_test_transforms(target_img_size=512):
             # transforms.ColorJitter(saturation=0.3),
             # transforms.Equalize(mode='pil',by_channels=True),
             A.Resize(height=target_img_size, width=target_img_size, p=1),
-            A.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+            A.Normalize(mean, std),
             ToTensorV2(p=1),
         ],
         p=1.0,
@@ -125,18 +134,24 @@ def get_test_transforms(target_img_size=512):
         ),
     )
 
+# def get_pred_transforms(target_img_size=512):
+#     return tfs.Compose(
+#         [
+#             tfs.Resize((target_img_size,target_img_size)),
+#             tfs.ToTensor(),
+#             tfs.Normalize(mean, std),
+#         ]
+#     )
+
 def get_pred_transforms(target_img_size=512):
     return A.Compose(
         [
-            A.Resize(height=target_img_size, width=target_img_size, p=1),
-            A.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+            A.Resize(height=target_img_size,width=target_img_size,p=1),
+            A.Normalize(mean, std),
             ToTensorV2(p=1),
-        ],
-        p=1.0,
-        bbox_params=A.BboxParams(
-            format="pascal_voc", min_area=0, min_visibility=0, label_fields=["labels"]
-        ),
+        ]
     )
+
 
 class EfficientDetDataset(Dataset):
     def __init__(
@@ -257,8 +272,8 @@ class EfficientDetDataModule(LightningDataModule):
         test_dataset = self.test_dataset()
         test_loader = torch.utils.data.DataLoader(
             test_dataset,
-            # batch_size=self.batch_size,
-            batch_size=1,
+            batch_size=self.batch_size,
+            # batch_size=1,
             shuffle=False,
             pin_memory=True,
             drop_last=False,
@@ -326,9 +341,21 @@ def get_dm(train,val,test,pred,batch_size=2):
         num_workers=4,
         batch_size=batch_size)
 
-def get_dm_standalone(path=main_ds,name="d801010", data_dir=None, batch_size=1):
+def get_data(ds='801010',file="test.txt"):
+    file = f"{imagesets_dir}{ds}/{file}"
+    if os.path.isfile(file):
+        return get_data_ds(read_imageset_names(ds,file))
+    else:
+        return get_data_ds(get_dir_imgs_names(data_dir))
+
+def get_dm_standalone(path=main_ds,name="d801010", data_file=None, batch_size=1):
+    """
+    Carga primero los Datasets con anotaciones y luego lee las imágenes de una carpeta
+    para crear el dataset para predecir.
+    """
     train, test, val = load_dss(path,name)
-    pred = get_data_ds(get_dir_imgs_names(data_dir))
+    # pred = get_data_ds(get_dir_imgs_names(data_dir))
+    pred = get_data(name,data_file)
     return get_dm(train,val,test,pred,batch_size)
 
 def get_dm2(name):
@@ -341,11 +368,6 @@ def get_dms_dss(dm):
 def get_main_df(path=main_ds):
     dataset_path = Path(path)
     return pd.read_csv(dataset_path/"ImageSets/all_annotations.csv")
-
-# def get_main_ds(path):
-#     dataset_path = Path(path)
-#     df = get_main_df(path)
-#     return TomatoDatasetAdaptor(dataset_path/"JPEGImages",df)
 
 def get_data_df(df, names):
     """
