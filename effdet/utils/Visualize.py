@@ -4,6 +4,7 @@ from matplotlib import patches
 import numpy as np
 from PIL import Image, ImageDraw as D, ImageFont
 import os
+import torchvision.transforms as T
 
 colors = ["red","orange","yellow","green","blue","purple"]
 
@@ -48,43 +49,19 @@ def draw_bboxes_confs(plot_ax, bboxes, confs=None,
             horizontalalignment='center',
             verticalalignment='top',color="orange")
 
-# def draw_image(image, bboxes, confs, loss, name):
-#     fig, ax = plt.subplots(figsize=(20,20))
-#     ax.imshow(image)
-#     draw_bboxes_conf(ax,bboxes,confs)
-#     plt.title(f"Loss: {loss}")
-#     plt.savefig(f"{name}.png")
-#     plt.close(fig)
-
-# def draw_images(images, bboxes, confs, names):
-#     fig, ax = plt.subplots(figsize=(20,20))
-#     for image, bboxs, conf, names in zip(images, bboxes, confs, names):
-#         draw_bboxes_conf(ax,bboxes,confs)
-#         plt.savefig(f"{name}.png")
-#     plt.close()
-
 def draw_img(ax,img,bboxes,confs=None):
     ax.imshow(img)
     draw_bboxes_confs(ax,bboxes[0],confs)
 
 def draw_images(image, bboxes, confs, loss, name, annots=None):
-    axes = []
-    if annots==None:
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20,20))
-        axes.append((ax1,ax2))
-    else:
-        fig, ax = plt.subplots(figsize=(20,20))
-        axes.append((ax,None))
-    for (ax1,ax2) in axes:
-        draw_img(ax1,image,bboxes,confs)
-        ax1.set_title("Imagen predecida")
-        if ax2:
-            draw_img(ax2,image,annots,None)
-            ax2.set_title("Imagen anotada")
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20,20))
     plt.title(f"Inferencia - Loss: {loss}.")
+    ax1.imshow(image)
+    draw_bboxes_confs(ax1,bboxes[0],confs)
+    ax2.imshow(image)
+    draw_bboxes_confs(ax2,annots,None)
     plt.savefig(f"{name}.png")
     plt.close(fig)
-
 
 def uniquify_name(name):
     """
