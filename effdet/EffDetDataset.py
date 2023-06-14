@@ -84,10 +84,16 @@ def denormalize(tensor):
 def get_train_transforms(target_img_size=512):
     return A.Compose(
         [
+            A.Blur(blur_limit=3, p=0.5),
             A.HorizontalFlip(p=0.5),
+            A.VerticalFlip(p=0.5),
+            A.Transpose(p=0.5),
+            A.RandomScale(p=0.3),
+            A.SafeRotate(p=0.5),
+            # A.augmentations.crops.transforms.BBoxSafeRandomCrop(p=0.5),
             transforms.ColorJitter(brightness=0.2),
-            # transforms.ColorJitter(contrast=0.2),
-            # transforms.ColorJitter(saturation=0.3),
+            transforms.ColorJitter(contrast=0.2),
+            transforms.ColorJitter(saturation=0.3),
             # transforms.Equalize(mode='pil',by_channels=True),
             A.Resize(height=target_img_size, width=target_img_size, p=1),
             A.Normalize(mean, std),
@@ -103,9 +109,15 @@ def get_train_transforms(target_img_size=512):
 def get_valid_transforms(target_img_size=512):
     return A.Compose(
         [
-            # transforms.ColorJitter(brightness=0.2),
-            # transforms.ColorJitter(contrast=0.2),
-            # transforms.ColorJitter(saturation=0.3),
+            A.Blur(blur_limit=3, p=0.5),
+            A.HorizontalFlip(p=0.5),
+            A.VerticalFlip(p=0.5),
+            A.Transpose(p=0.5),
+            A.RandomScale(p=0.3),
+            A.SafeRotate(p=0.5),
+            transforms.ColorJitter(brightness=0.2),
+            transforms.ColorJitter(contrast=0.2),
+            transforms.ColorJitter(saturation=0.3),
             # transforms.Equalize(mode='pil',by_channels=True),
             A.Resize(height=target_img_size, width=target_img_size, p=1),
             A.Normalize(mean, std),
@@ -120,9 +132,15 @@ def get_valid_transforms(target_img_size=512):
 def get_test_transforms(target_img_size=512):
     return A.Compose(
         [
-            # transforms.ColorJitter(brightness=0.2),
-            # transforms.ColorJitter(contrast=0.2),
-            # transforms.ColorJitter(saturation=0.3),
+            A.Blur(blur_limit=3, p=0.5),
+            A.HorizontalFlip(p=0.5),
+            A.VerticalFlip(p=0.5),
+            A.Transpose(p=0.5),
+            A.RandomScale(p=0.3),
+            A.SafeRotate(p=0.5),
+            transforms.ColorJitter(brightness=0.2),
+            transforms.ColorJitter(contrast=0.2),
+            transforms.ColorJitter(saturation=0.3),
             # transforms.Equalize(mode='pil',by_channels=True),
             A.Resize(height=target_img_size, width=target_img_size, p=1),
             A.Normalize(mean, std),
@@ -146,6 +164,12 @@ def get_test_transforms(target_img_size=512):
 def get_pred_transforms(target_img_size=512):
     return A.Compose(
         [
+            A.Blur(blur_limit=3, p=0.5),
+            A.HorizontalFlip(p=0.5),
+            A.VerticalFlip(p=0.5),
+            A.Transpose(p=0.5),
+            A.RandomScale(p=0.3),
+            A.SafeRotate(p=0.5),
             A.Resize(height=target_img_size,width=target_img_size,p=1),
             A.Normalize(mean, std),
             ToTensorV2(p=1),
