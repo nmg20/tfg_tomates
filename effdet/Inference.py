@@ -94,44 +94,19 @@ def inference_dl(name, dm):
 
 def inference_ds(name, ds, file, loss_flag):
     model = load_model(name)
-    output = Path(uniquify_dir(output_dir+"/run"))
+    output = Path(uniquify_dir(output_dir+f"/{name}_run"))
     if loss_flag==0:
         os.mkdir(output)
     model.eval()
-    num = 0
     losses = []
-    for img, ann in zip([i for i,_,_,_ in ds.get_imgs_and_anots()], [i for _,i,_,_ in ds.get_imgs_and_anots()]):
+    for img, ann, num in zip([i for i,_,_,_ in ds.get_imgs_and_anots()], [i for _,i,_,_ in ds.get_imgs_and_anots()], list(range(len(ds.get_imgs_and_anots())))):
          bboxes, _, confs, loss = model.predict([img])
          losses.append(float(loss))
          if loss_flag==0:
             draw_images_stacked(img, bboxes, confs, loss, f"{output}/predicted_img_{num}",ann)
-         num = num + 1
     if loss_flag==1:
-        draw_losses(losses,f"{output_dir}/Loss_{file}")
+        draw_losses(losses,(sum(losses)/len(losses)),f"{output_dir}/{name}_loss_{file}")
     return losses
-
-
-# def inferencev2(name="d801010",output_dir=output_dir):
-#     """
-#     Versión con una ruta a un ImageSet en lugar de leer los nombres
-#     de los ficheros en el directorio /data.
-#     """
-#     model = load_model(name)
-#     output=Path(uniquify_dir(output_dir+"/run"))
-#     os.mkdir(output)
-#     data_ds = get_data_ds(read_imageset_names(name))
-#     model.eval()
-#     images, anots = [i for i,_,_,_ in data_ds.get_imgs_and_anots()],[i for _,i,_,_ in data_ds.get_imgs_and_anots()]
-#     bboxes,_,confs, loss = model.predict(images)
-#     bboxes = simplify_bboxes(bboxes)
-#     save_hist(bboxes,"areas_histogram.png",True)
-#     save_hist(confs,"areas_histogram.png")
-#     # criterion = CE()
-#     for image, bbox, conf in zip(images, bboxes, confs):
-#         name = str(output)+"/"+image.filename.split("/")[-1].split(".")[0]
-#         # save_hist([bbox_area(x) for x in bbox],name+"_areas_hist.png")
-#         # save_hist(conf, name+"_confs_hist.png")
-#         draw_image(image, bbox, conf, name)
 
 def inference(model, file, loss):
     """
