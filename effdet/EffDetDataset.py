@@ -149,7 +149,11 @@ def get_pred_transforms(target_img_size=512):
             A.Resize(height=target_img_size,width=target_img_size,p=1),
             A.Normalize(mean, std),
             ToTensorV2(p=1),
-        ]
+        ],
+        p=1.0,
+        bbox_params=A.BboxParams(
+            format="pascal_voc", min_area=0, min_visibility=0, label_fields=["labels"]
+        ),
     )
 
 
