@@ -139,6 +139,7 @@ class EfficientDetModel(LightningModule):
     #     if targets:
     #         loss = CE(output, targets)
     #     return loss, output
+    
     def forward(self, images, targets):
         return self.model(images, targets)
 
