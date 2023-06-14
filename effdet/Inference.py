@@ -53,17 +53,8 @@ def save_hist(data, name, nbins, bboxes=False):
     plt.savefig(name)
     plt.close()
 
-def simplify_bboxes(bboxes):
-    return [[[round(x,2) for x in bbox] for bbox in bboxs] for bboxs in bboxes]
-
-# def read_imageset_names(ds="d801010",file="test.txt"):
-#     """
-#     Lee del set de imágenes de un dataset los nombres para emular que 
-#     se encuentran en la carpeta /data.
-#     """
-#     file = open(imagesets_dir+ds+f"/{file}")
-#     names = [x+".jpg" for x in file.read().split("\n")[::-1]]
-#     return names
+# def simplify_bboxes(bboxes):
+#     return [[[round(x,2) for x in bbox] for bbox in bboxs] for bboxs in bboxes]
 
 def imageset_to_pil(ds="801010",name="test.txt"):
     names = read_imageset_names(ds)
@@ -78,7 +69,12 @@ def inference_step(model, batch, output, num):
     draw_images(image, pred_bboxes, pred_confs, loss, f"{output}/predicted_img_{num}.png",anns)
 
 # def inference(name, compare):
-def inference_dm(name, dm):
+def inference_dl(name, dm):
+    """
+    Crea el dataloader de predicción y lo itera guardando el dibujo de la inferencia
+    para cada imagen.
+        -> errores en las bboxes de las anotaciones
+    """
     model = load_model(name)
     output=Path(uniquify_dir(output_dir+"/run"))
     os.mkdir(output)
@@ -96,35 +92,57 @@ def inference_dm(name, dm):
     finally:
         del dl
 
-def inferencev2(name="d801010",output_dir=output_dir):
-    """
-    Versión con una ruta a un ImageSet en lugar de leer los nombres
-    de los ficheros en el directorio /data.
-    """
+def inference_ds(name, ds, file, loss_flag):
     model = load_model(name)
-    output=Path(uniquify_dir(output_dir+"/run"))
-    os.mkdir(output)
-    data_ds = get_data_ds(read_imageset_names(name))
+    output = Path(uniquify_dir(output_dir+"/run"))
+    if loss_flag==0:
+        os.mkdir(output)
     model.eval()
-    images, anots = [i for i,_,_,_ in data_ds.get_imgs_and_anots()],[i for _,i,_,_ in data_ds.get_imgs_and_anots()]
-    bboxes,_,confs, loss = model.predict(images)
-    bboxes = simplify_bboxes(bboxes)
-    save_hist(bboxes,"areas_histogram.png",True)
-    save_hist(confs,"areas_histogram.png")
-    # criterion = CE()
-    for image, bbox, conf in zip(images, bboxes, confs):
-        name = str(output)+"/"+image.filename.split("/")[-1].split(".")[0]
-        # save_hist([bbox_area(x) for x in bbox],name+"_areas_hist.png")
-        # save_hist(conf, name+"_confs_hist.png")
-        draw_image(image, bbox, conf, name)
+    num = 0
+    losses = []
+    for img, ann in zip([i for i,_,_,_ in ds.get_imgs_and_anots()], [i for _,i,_,_ in ds.get_imgs_and_anots()]):
+         bboxes, _, confs, loss = model.predict([img])
+         losses.append(float(loss))
+         if loss_flag==0:
+            draw_images_stacked(img, bboxes, confs, loss, f"{output}/predicted_img_{num}",ann)
+         num = num + 1
+    if loss_flag==1:
+        draw_losses(losses,f"{output_dir}/Loss_{file}")
+    return losses
 
-def inference(model, file):
+
+# def inferencev2(name="d801010",output_dir=output_dir):
+#     """
+#     Versión con una ruta a un ImageSet en lugar de leer los nombres
+#     de los ficheros en el directorio /data.
+#     """
+#     model = load_model(name)
+#     output=Path(uniquify_dir(output_dir+"/run"))
+#     os.mkdir(output)
+#     data_ds = get_data_ds(read_imageset_names(name))
+#     model.eval()
+#     images, anots = [i for i,_,_,_ in data_ds.get_imgs_and_anots()],[i for _,i,_,_ in data_ds.get_imgs_and_anots()]
+#     bboxes,_,confs, loss = model.predict(images)
+#     bboxes = simplify_bboxes(bboxes)
+#     save_hist(bboxes,"areas_histogram.png",True)
+#     save_hist(confs,"areas_histogram.png")
+#     # criterion = CE()
+#     for image, bbox, conf in zip(images, bboxes, confs):
+#         name = str(output)+"/"+image.filename.split("/")[-1].split(".")[0]
+#         # save_hist([bbox_area(x) for x in bbox],name+"_areas_hist.png")
+#         # save_hist(conf, name+"_confs_hist.png")
+#         draw_image(image, bbox, conf, name)
+
+def inference(model, file, loss):
     """
     File -> leer nombres de imágenes de un archivo
         -> en su defecto leer de ./data/
     """
     if file in os.listdir(imagesets_dir+model+"/"):
         dm = get_dm_standalone(name=model,data_file=file)
+        file = file.split(".")[0]
     else:
         dm = get_dm_standalone(name=model,data_file=data_dir)
-    inference_dm(model,dm)
+        file = file.replace("/","").split(".")[1]
+    # inference_dl(model,dm)
+    inference_ds(model,dm.pred_dataset().ds, file, loss)
