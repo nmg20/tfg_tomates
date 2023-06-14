@@ -26,15 +26,18 @@ def dir_path(path):
 def main():
     """
     Elegir si leer las imágenes de un directorio o un fichero con los nombres
+    
+        -> añadir un flag para simplemente registrar la loss.
     """
     parser = argparse.ArgumentParser()
     parser.add_argument('-m', '--model', type=str, help="Número de épocas de entrenamiento.")
     # parser.add_argument('-c', '--compare', default=False, action='store_true')
     parser.add_argument('-f', '--file', type=str, help="Fichero del que leer los nombres de las imágenes.")
-    
+    parser.add_argument('-l', '--loss', type=int, help="Flag para que la inferenci sólo registre la loss para cada imagen.")
+
     args = parser.parse_args()
     # inference(args.model, args.compare)
-    inference(args.model, args.file)
+    inference(args.model, args.file, args.loss)
 
 if __name__=="__main__":
     main()
