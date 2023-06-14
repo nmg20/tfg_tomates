@@ -29,6 +29,23 @@ def get_bbox_dim(bbox):
 
     return width, height
 
+def draw_pascal_voc_bboxes(
+    plot_ax,
+    bboxes,
+    get_rectangle_corners_fn=get_rectangle_edges_from_pascal_bbox,
+):
+    for bbox in bboxes:
+        bottom_left, width, height = get_rectangle_corners_fn(bbox)
+
+        plot_ax.add_patch(patches.Rectangle(
+            bottom_left,
+            width,
+            height,
+            linewidth=1,
+            edgecolor="orange",
+            fill=False,
+        ))
+
 def draw_bboxes_confs(plot_ax, bboxes, confs=None,
     get_rectangle_corners_fn=get_rectangle_edges_from_pascal_bbox,
 ):
@@ -45,7 +62,7 @@ def draw_bboxes_confs(plot_ax, bboxes, confs=None,
         ))
         if confs:
             plot_ax.text(bottom_left[0]+0.5*width,y2,
-                str(confs[0][i])[0:4], fontsize=18,
+                str(confs[0][i])[0:4], fontsize=12,
             horizontalalignment='center',
             verticalalignment='top',color="orange")
 
@@ -55,13 +72,32 @@ def draw_img(ax,img,bboxes,confs=None):
 
 def draw_images(image, bboxes, confs, loss, name, annots=None):
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20,20))
-    plt.title(f"Inferencia - Loss: {loss}.")
+    fig.suptitle(f"Inferencia - Loss: {loss}.", fontsize=16)
     ax1.imshow(image)
     draw_bboxes_confs(ax1,bboxes[0],confs)
     ax2.imshow(image)
     draw_bboxes_confs(ax2,annots,None)
     plt.savefig(f"{name}.png")
     plt.close(fig)
+
+def draw_images_stacked(image, bboxes, confs, loss, name, annots=None):
+    fig, axs = plt.subplots(2, figsize=(20,20))
+    fig.suptitle(f"Inferencia - Loss: {loss}.", fontsize=20)
+    axs[0].imshow(image)
+    axs[0].set_title("Imagen predecida")
+    draw_bboxes_confs(axs[0],bboxes[0],confs)
+    axs[1].imshow(image)
+    axs[1].set_title("Imagen anotada")
+    draw_bboxes_confs(axs[1],annots,None)
+    plt.savefig(f"{name}.png")
+    plt.close(fig)
+
+def draw_losses(losses, name):
+    fig = plt.plot(losses)
+    plt.ylabel("Losses")
+    plt.xlabel("Imágenes")
+    plt.savefig(name+".png")
+    plt.close()
 
 def uniquify_name(name):
     """
