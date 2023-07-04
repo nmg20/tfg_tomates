@@ -165,7 +165,8 @@ class EfficientDetModel(LightningModule):
 
         return losses['loss']
 
-    @torch.no_grad()
+    # @torch.no_grad()
+    @torch.inference_mode()
     def validation_step(self, batch, batch_idx):
         images, annotations, targets, image_ids = batch
         outputs = self.model(images, annotations)
@@ -189,7 +190,8 @@ class EfficientDetModel(LightningModule):
 
         return {'loss': outputs["loss"], 'batch_predictions': batch_predictions}
     
-    @torch.no_grad()
+    # @torch.no_grad()
+    @torch.inference_mode()
     def test_step(self, batch, batch_idx):
         image, annotations, targets, image_ids = batch
         outputs = self.model(image, annotations)
@@ -210,6 +212,7 @@ class EfficientDetModel(LightningModule):
         return {'loss': outputs["loss"], 'batch_predictions': batch_predictions}
 
     @typedispatch
+    @torch.inference_mode()
     def predict(self, images: List):
         """
         For making predictions from images
@@ -223,6 +226,7 @@ class EfficientDetModel(LightningModule):
         return self._run_inference(images_tensor, images_sizes)
 
     @typedispatch
+    @torch.inference_mode()
     def predict(self, images_tensor: torch.Tensor):
         """
         For making predictions from tensors returned from the model's dataloader
