@@ -10,6 +10,7 @@ import glob
 import pandas as pd
 import xml.etree.ElementTree as ET
 
+dssrc = "T1280x720_test/"
 
 """
 Idea: 1 argumento (la carpeta del ds original)
@@ -25,6 +26,14 @@ Idea: 1 argumento (la carpeta del ds original)
 
 """
 
+def dir_path(path):
+    if os.path.isdir(path):
+        return path
+    else:
+        # warnings.warn(f"El directorio {path} no existe, pero te lo creo al toque mi rey.",stacklevel=2)
+        os.mkdir(path)
+        return path
+
 def wr(file, list):
     """
     Dado un archvio file, escribe los nombres de los archivos en
@@ -35,6 +44,17 @@ def wr(file, list):
     with open(file, "w") as f:
         for i in list:
             f.write(i.split(".")[0]+"\n")
+
+def saveAnnotations(names, src, dst):
+    """
+    Dada una lista de nombres "{}.jpg", buscamos sus anotaciones
+    correspondientes y las guardamos en una carpeta aparte.
+    """
+    for name in names:
+        name = str(Path(name).stem)
+        og = (src+name+".xml")
+        tg = (dst+name+".xml")
+        shutil.copy(og, tg)
 
 def split(names, div, test_aux=[]):
     names = list(set(names).difference(set(test_aux)))
@@ -86,21 +106,51 @@ def writeImageSets(dest, train, test, val):
     wr(dest+"val.txt", val)
     wr(dest+"trainval.txt", train+val)
 
-def make_annotations(dest, name, annsrc, train, val, test):
-    anndst = f"{dest}Annotations/{name}"
-    if not os.path.exists(f"{dest}Annotations/{name}"):
-        os.makedirs(anndst)
-        os.makedirs(f"{anndst}/train/")
-        os.makedirs(f"{anndst}/test/")
-        os.makedirs(f"{anndst}/val/")
+def make_imagesets(name, train, val, test, src=dssrc):
+    imageset_name = f"{src}ImageSets/{name}/"
+    if not os.path.exists(imageset_name):
+        os.makedirs(imageset_name)
+    writeImageSets(imageset_name,train, test, val)
+
+def make_annotations(name, train, val, test, src=dssrc):
+    """
+    dest = "T1280x720_test/"
+    name = "d502030"
+    annsrc = src + "Annotations/"
+    """
+    anndst = f"{src}ImageSets/{name}"
+    annsrc = f"{src}Annotations/"
+    os.makedirs(f"{anndst}/train/")
+    os.makedirs(f"{anndst}/test/")
+    os.makedirs(f"{anndst}/val/")
     saveAnnotations(train, annsrc, anndst+"/train/")
     saveAnnotations(test, annsrc, anndst+"/test/")
     saveAnnotations(val, annsrc, anndst+"/val/")
 
-def make_imagesets(dest, name, train, val, test):
-    if not os.path.exists(f"{dest}ImageSets/{name}/"):
-        os.makedirs(f"{dest}ImageSets/{name}/")
-    writeImageSets(f"{dest}ImageSets/{name}/",train, test, val)
+
+def zip_anns(path):
+    """
+    Lee de un directorio con las carpteas train, test y val.
+    Comprime las anotaciones de cada carpeta en un fichero .csv.
+    """
+    path = dssrc + "ImageSets/" + path 
+    datasets = ['train', 'test', 'val']
+    for ds in datasets:
+        annotations_path = f"{path}/{ds}"
+        xml_df = xml_to_csv(annotations_path)
+        xml_df.to_csv(f"{path}/labels{ds}.csv")
+        print(f'Successfully converted xml to csv.[{ds}]')
+
+
+def save_ds(src, names, divs):
+    test = []
+    divs.sort(key = lambda x: x[2], reverse=True)
+    for div in divs:
+        train, test, val = split(names, div, test)
+        name = "d"+"".join([str(int(x*100)) for x in div])
+        make_annotations(name, train, val, test)
+        make_imagesets(name, train, test, val)
+        zip_anns(name)
 
 def main():
     """
@@ -110,24 +160,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('source_dir',help="carpeta con la imágenes a procesar.", 
         type = dir_path)
-    parser.add_argument('target_dir',help="carpeta en la que volcar el procesado.", 
-        type = dir_path)
     args = parser.parse_args()
     src = args.source_dir
-    dest = args.target_dir
         
     imgsrc = src+"JPEGImages/"
-    imgdst = dest+"images/"
-    annsrc = src+"Annotations/"
-    anndst = dest+"annotations/"
-
-    divs = [[0.8,0.1,0.1],[0.7,0.15,0.15],[0.6,0.2,0.2]]
-    splitted_dss = split_aux(os.listdir(src+"JPEGImages/"),divs)
-    for ds, div in zip(splitted_dss, divs):
-        train, test, val = ds
-        name = "d"+''.join([str(int(x*100)) for x in div])
-        make_annotations(dest, name, annsrc, train, val, test)
-        make_imagesets(dest, name, train, val, test)
+    divs = [[0.8,0.1,0.1],[0.7,0.15,0.15],[0.6,0.2,0.2],[0.5,0.2,0.3]]
+    save_ds(src, os.listdir(imgsrc), divs)
 
 if __name__=='__main__':
     main()
