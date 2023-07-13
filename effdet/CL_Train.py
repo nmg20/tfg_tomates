@@ -11,6 +11,7 @@ import os
 
 models_dir = "modelos/"
 main_ds = "../../datasets/Tomato_1280x720/"
+# main_ds = "../../datasets/T1280x720_test/"
 
 def validate_file(f):
     if not os.path.exists(f):
@@ -29,13 +30,14 @@ def main():
     parser.add_argument('-s','--save',type=str, help="Flag para guardar el modelo entrenado")
     # parser.add_argument('-d','--debug',type=str, help="Flag para debuggear registrando el área de los bounding boxes.")
     args = parser.parse_args()
-    dm = get_dm_standalone(main_ds,args.name)
+    # dm = get_dm_standalone(main_ds,args.name)
+    dm = get_dm_standalone(name=args.name)
     #DEBUG
     # if args.debug :
     #     data_file = open(args.debug,"w")
     # else:
     #     data_file = False
-    data_file = False
+    # data_file = False
     # model = EfficientDetModel(data_file)
     model = EfficientDetModel()
     model_name = args.name
