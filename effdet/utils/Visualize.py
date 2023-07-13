@@ -70,6 +70,14 @@ def draw_img(ax,img,bboxes,confs=None):
     ax.imshow(img)
     draw_bboxes_confs(ax,bboxes[0],confs)
 
+def draw_ax(ax, img, bboxes, confs, loss, name):
+    ax.imshow(img)
+    draw_bboxes_confs(ax, bboxes, confs)
+    ax.title.set_text(f'name: {loss}')
+
+def draw_subplots(image, bboxes, confs, loss, names):
+    fig, 
+
 def draw_images(image, bboxes, confs, loss, name, annots=None):
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20,20))
     fig.suptitle(f"Inferencia - Loss: {loss}.", fontsize=16)
@@ -92,8 +100,10 @@ def draw_images_stacked(image, bboxes, confs, loss, name, annots=None):
     plt.savefig(f"{name}.png")
     plt.close(fig)
 
-def draw_losses(losses, name):
-    fig = plt.plot(losses)
+def draw_losses(losses, mean, name):
+    # fig = plt.plot(losses)
+    plt.plot(losses)
+    plt.title(f"Loss media: {mean}")
     plt.ylabel("Losses")
     plt.xlabel("Imágenes")
     plt.savefig(name+".png")
