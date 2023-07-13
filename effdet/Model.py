@@ -113,7 +113,7 @@ class EfficientDetModel(LightningModule):
         prediction_confidence_threshold=0.2,
         learning_rate=0.0002,
         wbf_iou_threshold=0.44,
-        inference_transforms=get_valid_transforms(target_img_size=512),
+        inference_transforms=get_pred_transforms(target_img_size=512),
         model_architecture='tf_efficientnetv2_l',
         output_dir="./outputs/",
         # data_file=None,
@@ -226,7 +226,7 @@ class EfficientDetModel(LightningModule):
         return self._run_inference(images_tensor, images_sizes)
 
     @typedispatch
-    @torch.inference_mode()
+    # @torch.inference_mode()
     def predict(self, images_tensor: torch.Tensor):
         """
         For making predictions from tensors returned from the model's dataloader
@@ -305,9 +305,10 @@ class EfficientDetModel(LightningModule):
         boxes = detections.detach().cpu().numpy()[:, :4]
         scores = detections.detach().cpu().numpy()[:, 4]
         classes = detections.detach().cpu().numpy()[:, 5]
+        # print("BOXES",boxes,"\n")
+        # print("SCORES",scores,"\n")
         indexes = np.where(scores > self.prediction_confidence_threshold)[0]
         boxes = boxes[indexes]
-
         return {"boxes": boxes, "scores": scores[indexes], "classes": classes[indexes]}
 
     def __rescale_bboxes(self, predicted_bboxes, image_sizes):
