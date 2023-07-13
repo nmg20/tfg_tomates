@@ -1,34 +1,39 @@
 import numpy as np
 import cv2 as cv
 import torch
+import os
 torch.manual_seed(17)
 import pandas as pd
-from utils.dataset_to_csv import *
-from utils.Visualize import *
+# from utils.dataset_to_csv import *
+# from utils.Visualize import *
+from utils import Visualize, dataset_to_csv
+from Dataset_Analysis import read_imageset_names
 
 datasets_dir = "/media/rtx3090/Disco2TB/cvazquez/nico/datasets/"
-main_ds = "/media/rtx3090/Disco2TB/cvazquez/nico/datasets/Tomato_1280x720/"
-images_dir = "../../datasets/Tomato_1280x720/JPEGImages/"
-imagesets_dir = "../../datasets/Tomato_1280x720/ImageSets/"
+# main_ds = "/media/rtx3090/Disco2TB/cvazquez/nico/datasets/Tomato_1280x720/"
+main_ds = "/media/rtx3090/Disco2TB/cvazquez/nico/datasets/T1280x720_test/"
+images_dir = main_ds+"JPEGImages/"
+imagesets_dir = main_ds+"ImageSets/"
 data_dir = os.path.abspath("./data/")
 
 from pathlib import Path
 
 def read_anots(image):
-    df = pd.read_csv(main_ds+"/ImageSets/all_annotations.csv")
+    df = pd.read_csv(imagesets_dir+"all_annotations.csv")
     return df[df.image==image.filename.split("/")[-1]][["xmin", "ymin", "xmax", "ymax"]].values
 
 def get_dir_imgs_names(imgs_dir=data_dir):
     return [x for x in os.listdir(imgs_dir) if x[len(x)-4::]=='.jpg']
 
-def read_imageset_names(ds="d801010",file="test.txt"):
-    """
-    Lee del set de imágenes de un dataset los nombres para emular que 
-    se encuentran en la carpeta /data.
-    """
-    file = open(file)
-    names = [x+".jpg" for x in file.read().split("\n")[::-1]]
-    return names
+# def read_imageset_names(ds="d801010",file="test.txt"):
+#     """
+#     Lee del set de imágenes de un dataset los nombres para emular que 
+#     se encuentran en la carpeta /data.
+#     """
+#     # file = open(f"{imagesets_dir}{ds}/{file}")
+#     file = open(file)
+#     names = [x+".jpg" for x in file.read().split("\n")[::-1]]
+#     return names
 
 class TomatoDatasetAdaptor:
     def __init__(self, images_dir_path, annotations_dataframe):
@@ -104,7 +109,6 @@ def get_train_transforms(target_img_size=512):
             format="pascal_voc", min_area=0, min_visibility=0, label_fields=["labels"]
         ),
     )
-
 
 def get_valid_transforms(target_img_size=512):
     return A.Compose(
@@ -362,6 +366,7 @@ def load_dss(path,name):
     return train_ds, test_ds, val_ds
 
 def get_dm(train,val,test,pred,batch_size=2):
+# def get_dm(train,val,test,batch_size=2):
     return EfficientDetDataModule(train_dataset_adaptor=train, 
         validation_dataset_adaptor=val,
         test_dataset_adaptor=test,
@@ -370,7 +375,8 @@ def get_dm(train,val,test,pred,batch_size=2):
         batch_size=batch_size)
 
 def get_data(ds='801010',file="test.txt"):
-    file = f"{imagesets_dir}{ds}/{file}"
+    # file = f"{imagesets_dir}{ds}/{file}"
+    file = file.split(".")[0]
     if os.path.isfile(file):
         return get_data_ds(read_imageset_names(ds,file))
     else:
@@ -385,13 +391,14 @@ def get_dm_standalone(path=main_ds,name="d801010", data_file=None, batch_size=1)
     # pred = get_data_ds(get_dir_imgs_names(data_dir))
     pred = get_data(name,data_file)
     return get_dm(train,val,test,pred,batch_size)
+    # return get_dm(train,val,test,batch_size)
 
-def get_dm2(name):
-    train,test,val=load_dss(main_ds,name)
-    return get_dm(train,val,test,2)
+# def get_dm2(name):
+#     train,test,val=load_dss(main_ds,name)
+#     return get_dm(train,val,test,2)
 
-def get_dms_dss(dm):
-    return dm.train_ds,dm.valid_ds,dm.test_ds
+# def get_dms_dss(dm):
+#     return dm.train_ds,dm.valid_ds,dm.test_ds
 
 def get_main_df(path=main_ds):
     dataset_path = Path(path)
@@ -419,5 +426,3 @@ def get_data_ds(names, path=main_ds):
     main_df = get_main_df()
     df = get_data_df(main_df,names)
     return TomatoDatasetAdaptor(dataset_path/"JPEGImages",df)
-
-
