@@ -1,35 +1,3 @@
-from effdet.config.model_config import efficientdet_model_param_dict
-from effdet import get_efficientdet_config, EfficientDet, DetBenchTrain
-from effdet.efficientdet import HeadNet
-from effdet.config.model_config import efficientdet_model_param_dict
-
-import timm
-from EffDetDataset import *
-# import EffDetDataset
-# from torchmetrics.detection import mean_ap as MAP
-import matplotlib.pyplot as plt
-
-models_path = os.path.abspath("./modelos/")
-
-def create_model(num_classes=1, image_size=512, architecture="tf_efficientnetv2_l"):
-    efficientdet_model_param_dict[architecture] = dict(
-        name=architecture,
-        backbone_name=architecture,
-        backbone_args=dict(drop_path_rate=0.2),
-        num_classes=num_classes,
-        url='', )
-    
-    config = get_efficientdet_config(architecture)
-    config.update({'num_classes': num_classes})
-    config.update({'image_size': (image_size, image_size)})
-    
-    net = EfficientDet(config, pretrained_backbone=True)
-    net.class_net = HeadNet(
-        config,
-        num_outputs=config.num_classes,
-    )
-    return DetBenchTrain(net, config)
-
 from numbers import Number
 from typing import List
 from functools import singledispatch
@@ -52,19 +20,48 @@ from pytorch_lightning import LightningModule
 
 from ensemble_boxes import ensemble_boxes_wbf
 
-def bbox_area(bbox):
-    return abs((bbox[2]-bbox[0])*(bbox[3]-bbox[1]))
+from effdet.config.model_config import efficientdet_model_param_dict
+from effdet import get_efficientdet_config, EfficientDet, DetBenchTrain
+from effdet.efficientdet import HeadNet
+from effdet.config.model_config import efficientdet_model_param_dict
+from utils.config import *
+import timm
+from EffDetDataset import *
+import matplotlib.pyplot as plt
 
-def bboxes_area(bboxes):
-    return [bbox_area(x) for x in bboxes]
 
-def save_sizes(bboxes, file):
-    for bbox in bboxes:
-        file.write(f"{bbox_area(bbox)}\n")
+def create_model(num_classes=1, image_size=512, architecture="tf_efficientnetv2_l"):
+    efficientdet_model_param_dict[architecture] = dict(
+        name=architecture,
+        backbone_name=architecture,
+        backbone_args=dict(drop_path_rate=0.2),
+        num_classes=num_classes,
+        url='', )
+    
+    config = get_efficientdet_config(architecture)
+    config.update({'num_classes': num_classes})
+    config.update({'image_size': (image_size, image_size)})
+    
+    net = EfficientDet(config, pretrained_backbone=True)
+    net.class_net = HeadNet(
+        config,
+        num_outputs=config.num_classes,
+    )
+    return DetBenchTrain(net, config)
 
-def save_anots(bboxes, file):
-    for bbox in bboxes:
-        file.write(f"{bbox}\n")
+# def bbox_area(bbox):
+#     return abs((bbox[2]-bbox[0])*(bbox[3]-bbox[1]))
+
+# def bboxes_area(bboxes):
+#     return [bbox_area(x) for x in bboxes]
+
+# def save_sizes(bboxes, file):
+#     for bbox in bboxes:
+#         file.write(f"{bbox_area(bbox)}\n")
+
+# def save_anots(bboxes, file):
+#     for bbox in bboxes:
+#         file.write(f"{bbox}\n")
 
 def images_to_tensor(images, transform=get_valid_transforms(512)):
     image_sizes = [(image.size[1], image.size[0]) for image in images]
@@ -80,17 +77,22 @@ def images_to_tensor(images, transform=get_valid_transforms(512)):
     ), image_sizes
 
 
-def run_wbf(predictions, image_size=512, iou_thr=0.44, skip_box_thr=0.43, weights=None):
+# def run_wbf(predictions, image_size=512, iou_thr=0.44, skip_box_thr=0.2, weights=None):
+def run_wbf(predictions, image_size=512, iou_thr=0.55, skip_box_thr=0.2, weights=None):
     bboxes = []
     confidences = []
     class_labels = []
 
     for prediction in predictions:
         boxes = [(prediction["boxes"] / image_size).tolist()]
+        # boxes = [(prediction["boxes"]).tolist()]
         scores = [prediction["scores"].tolist()]
         labels = [prediction["classes"].tolist()]
-
+        # print(f"\nLen Boxes: {len(boxes)}\nBoxes(Pre): {boxes}")
+        # print(f"\nLen Scores: {len(scores)}\nScores: {scores}")
+        # boxes = boxes * (image_size - 1)
         boxes, scores, labels = ensemble_boxes_wbf.weighted_boxes_fusion(
+            # boxes * (image_size - 1),
             boxes,
             scores,
             labels,
@@ -102,7 +104,7 @@ def run_wbf(predictions, image_size=512, iou_thr=0.44, skip_box_thr=0.43, weight
         bboxes.append(boxes.tolist())
         confidences.append(scores.tolist())
         class_labels.append(labels.tolist())
-
+    # print("\nBoxes (Post): ",boxes)
     return bboxes, confidences, class_labels
 
 class EfficientDetModel(LightningModule):
@@ -110,7 +112,7 @@ class EfficientDetModel(LightningModule):
         self,
         num_classes=1,
         img_size=512,
-        prediction_confidence_threshold=0.2,
+        prediction_confidence_threshold=0.01,
         learning_rate=0.0002,
         wbf_iou_threshold=0.44,
         inference_transforms=get_pred_transforms(target_img_size=512),
@@ -169,6 +171,7 @@ class EfficientDetModel(LightningModule):
     @torch.inference_mode()
     def validation_step(self, batch, batch_idx):
         images, annotations, targets, image_ids = batch
+        # print("\nAnnotations: ", annotations)
         outputs = self.model(images, annotations)
         detections = outputs["detections"]
 
@@ -211,8 +214,21 @@ class EfficientDetModel(LightningModule):
                  prog_bar=True, logger=True, sync_dist=True)
         return {'loss': outputs["loss"], 'batch_predictions': batch_predictions}
 
+    # @typedispatch
+    # @torch.inference_mode()
+    # def predict(self, images: List):
+    #     """
+    #     For making predictions from images
+    #     Args:
+    #         images: a list of PIL images
+
+    #     Returns: a tuple of lists containing bboxes, predicted_class_labels, predicted_class_confidences
+
+    #     """
+    #     images_tensor, images_sizes = images_to_tensor(images)
+    #     return self._run_inference(images_tensor, images_sizes)
+
     @typedispatch
-    @torch.inference_mode()
     def predict(self, images: List):
         """
         For making predictions from images
@@ -222,8 +238,19 @@ class EfficientDetModel(LightningModule):
         Returns: a tuple of lists containing bboxes, predicted_class_labels, predicted_class_confidences
 
         """
-        images_tensor, images_sizes = images_to_tensor(images)
-        return self._run_inference(images_tensor, images_sizes)
+        image_sizes = [(image.size[1], image.size[0]) for image in images]
+        images_tensor = torch.stack(
+            [
+                self.inference_tfms(
+                    image=np.array(image, dtype=np.float32),
+                    labels=np.ones(1),
+                    bboxes=np.array([[0, 0, 1, 1]]),
+                )["image"]
+                for image in images
+            ]
+        )
+
+        return self._run_inference(images_tensor, image_sizes)
 
     @typedispatch
     # @torch.inference_mode()
@@ -257,7 +284,6 @@ class EfficientDetModel(LightningModule):
             )
         results = self.model(images_tensor.to(self.device), targets)
         loss = results['loss']
-        # print(f"LOSS: {results['loss']}")
         detections = results[
             "detections"
         ]
@@ -270,7 +296,6 @@ class EfficientDetModel(LightningModule):
         scaled_bboxes = self.__rescale_bboxes(
             predicted_bboxes=predicted_bboxes, image_sizes=image_sizes
         )
-        # print(scaled_bboxes)
 
         return scaled_bboxes, predicted_class_labels, predicted_class_confidences, loss
     
@@ -305,8 +330,6 @@ class EfficientDetModel(LightningModule):
         boxes = detections.detach().cpu().numpy()[:, :4]
         scores = detections.detach().cpu().numpy()[:, 4]
         classes = detections.detach().cpu().numpy()[:, 5]
-        # print("BOXES",boxes,"\n")
-        # print("SCORES",scores,"\n")
         indexes = np.where(scores > self.prediction_confidence_threshold)[0]
         boxes = boxes[indexes]
         return {"boxes": boxes, "scores": scores[indexes], "classes": classes[indexes]}
@@ -471,12 +494,20 @@ def get_model():
     return EfficientDetModel()
 
 def load_checkpoint(path):
-    return EfficientDetModel.load_from_checkpoint(path)
+    return EfficientDetModel.load_from_checkpoint(models_dir+"/"+path+".ckpt")
+
+def load_ex_model(model, path):
+    return model.load_state_dict(torch.load(models_dir+"/"+path+".pt"))
+
+# def load_model(path="d801010"):
+#     model = EfficientDetModel(num_classes=1, img_size=512)
+#     if path+".ckpt" in os.listdir(models_dir):
+#         return load_checkpoint(path)
+#     else:
+#         load_ex_model(model, path)
+#         return model
 
 def load_model(path="d801010"):
     model = EfficientDetModel(num_classes=1, img_size=512)
-    model.load_state_dict(torch.load(models_path+"/"+path+".pt"))
+    load_ex_model(model, path)
     return model
-
-def load_ex_model(model, path):
-    model.load_state_dict(torch.load(models_path+"/"+path+".pt"))
