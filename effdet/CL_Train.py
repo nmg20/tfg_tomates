@@ -2,16 +2,12 @@ from pathlib import Path
 from EffDetDataset import *
 from Model import *
 from Train import *
-from Inference import file_to_bboxes, save_hist
 import torch
 from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import TensorBoardLogger
 import argparse
 import os
-
-models_dir = "modelos/"
-main_ds = "../../datasets/Tomato_1280x720/"
-# main_ds = "../../datasets/T1280x720_test/"
+from utils.config import *
 
 def validate_file(f):
     if not os.path.exists(f):
@@ -22,12 +18,13 @@ def validate_file(f):
 
 def dir_path(path):
     return Path(path).mkdir(parents=True, exist_ok=True)
-    
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-e', '--epochs', type=int, help="Número de épocas de entrenamiento.")
     parser.add_argument('-n','--name',type=str)
-    parser.add_argument('-s','--save',type=str, help="Flag para guardar el modelo entrenado")
+    parser.add_argument('-s','--save',type=int, help="Flag para guardar el modelo entrenado.")
+    parser.add_argument('-r','--res',type=int, help="Flag para seguir entrenando desde un checkpoint.")
     # parser.add_argument('-d','--debug',type=str, help="Flag para debuggear registrando el área de los bounding boxes.")
     args = parser.parse_args()
     # dm = get_dm_standalone(main_ds,args.name)
@@ -41,8 +38,9 @@ def main():
     # model = EfficientDetModel(data_file)
     model = EfficientDetModel()
     model_name = args.name
-    logger = TensorBoardLogger("lightning_logs/",name=model_name)
-    train_model(model,dm,args.epochs,logger)
+    logger = TensorBoardLogger(logs_dir,name=model_name)
+    path = None if args.res==1 else get_ckpt(args.name)
+    train_model(model,dm,args.epochs,logger,None)
     if args.save==1:
         torch.save(model.state_dict(),f"{models_dir}{model_name}.pt")
     # if args.debug:
