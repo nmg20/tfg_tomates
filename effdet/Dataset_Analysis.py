@@ -7,19 +7,18 @@ import os
 import torchvision.transforms as T
 import pandas as pd
 import sys
-
-# import Inference
-import EffDetDataset
-
-main_ds = "/media/rtx3090/Disco2TB/cvazquez/nico/datasets/T1280x720_test/"
-output_dir = "/media/rtx3090/Disco2TB/cvazquez/nico/tfg_tomates/effdet/otputs/"
-imagesets_dir = main_ds + "ImageSets/"
+from utils.config import *
+from scipy.stats import ttest_ind, ttest_rel
 
 def area_bbox(bbox):
     return abs((bbox[2]-bbox[0])*(bbox[3]-bbox[1]))
 
 def area_bboxes(bboxes):
-	return [area_bbox(x) for x in bboxes]
+    return [area_bbox(x) for x in bboxes]
+
+def get_hist(data, nBins=500):
+    hist, bins, _ = plt.hist(data, nBins)
+    return hist
 
 def save_hist(data, name, nbins=None):
     """
@@ -42,23 +41,21 @@ Pensar si coger las bboxes del csv o después de ser transformadas.
 -> la distribución debería mantenerse.
 """
 def csv_to_df(csv_path):
-	return pd.read_csv(csv_path)
+    return pd.read_csv(csv_path)
 
 def get_bboxes_from_df(df):
-	return np.concatenate([x for x in [df[df.image==x][["xmin", "ymin", "xmax", "ymax"]].values
-		for x in set(df.image)]])
+    return np.concatenate([x for x in [df[df.image==x][["xmin", "ymin", "xmax", "ymax"]].values
+        for x in set(df.image)]])
 
 def build_path(file, ds="d801010"):
-	if file=="all":
-		name = f"{imagesets_dir}all_annotations.csv"
-	else:
-		name = f"{imagesets_dir}{ds}/labels{file}.csv"
-	return name
+    if file=="all":
+        name = f"{imagesets_dir}all_annotations.csv"
+    else:
+        name = f"{imagesets_dir}{ds}/labels{file}.csv"
+    return name
 
 def get_bboxes_from_ds(ds):
-	return get_bboxes_from_df(ds.annotations_df)
-
-# def get_main_ds(path)
+    return get_bboxes_from_df(ds.annotations_df)
 
 def read_imageset_names(ds="d801010",file="test"):
     """
@@ -70,20 +67,22 @@ def read_imageset_names(ds="d801010",file="test"):
     names = [x+".jpg" for x in file.read().split("\n")[::-1]][1::]
     return names
 
-def ds_to_bbox_sizes(ds):
-	anns = []
-	# an = [anns+x.tolist() for _,x,_,_ in ds.get_imgs_and_anots()]
-		# anns=anns.concatenate((anns,x))
-	for _,x,_,_ in ds.get_imgs_and_anots():
-		an = []
-		anns.append([an+y.tolist() for y in x])
-	return anns
+def compare_hist(ds="d801010",conj="test"):
+    main_hist = get_hist(area_bboxes_from_df(csv_to_df(
+        imagesets_dir+"all_annotations.csv")))
+    hist = get_hist(area_bboxes_from_df(csv_to_df(build_path(
+        conj, ds))))
+    mean1, mean2 = np.mean(main_hist), np.mean(hist)
+    std1, std2 = np.std(main_hist), np.std(hist)
+    ttest = ttest_ind(hist, main_hist)
+    dif = hist2 - hist
+
 
 
 def get_all_hists(output=output_dir):
-	dss, cjs = ["d801010","d701515","d602020","d502030"], ["train","test", "val"]
-	for ds in dss:
-		for cj in cjs:
-			save_hist(area_bboxes(get_bboxes_from_csv(
-				build_path(cj,ds))),f"{output}/{ds}_{cj}.png"
-				, None) 
+    dss, cjs = ["d801010","d701515","d602020","d502030"], ["train","test", "val"]
+    for ds in dss:
+        for cj in cjs:
+            save_hist(area_bboxes(get_bboxes_from_df(csv_to_df(
+                build_path(cj,ds)))),f"{output}/{ds}_{cj}.png"
+                , None) 
