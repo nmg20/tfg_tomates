@@ -4,19 +4,10 @@ import torch
 import os
 torch.manual_seed(17)
 import pandas as pd
-# from utils.dataset_to_csv import *
-# from utils.Visualize import *
 from utils import Visualize, dataset_to_csv
-from Dataset_Analysis import read_imageset_names
-
-datasets_dir = "/media/rtx3090/Disco2TB/cvazquez/nico/datasets/"
-# main_ds = "/media/rtx3090/Disco2TB/cvazquez/nico/datasets/Tomato_1280x720/"
-main_ds = "/media/rtx3090/Disco2TB/cvazquez/nico/datasets/T1280x720_test/"
-images_dir = main_ds+"JPEGImages/"
-imagesets_dir = main_ds+"ImageSets/"
-data_dir = os.path.abspath("./data/")
-
+from Dataset_Analysis import read_imageset_names, Image
 from pathlib import Path
+from utils.config import *
 
 def read_anots(image):
     df = pd.read_csv(imagesets_dir+"all_annotations.csv")
@@ -24,16 +15,6 @@ def read_anots(image):
 
 def get_dir_imgs_names(imgs_dir=data_dir):
     return [x for x in os.listdir(imgs_dir) if x[len(x)-4::]=='.jpg']
-
-# def read_imageset_names(ds="d801010",file="test.txt"):
-#     """
-#     Lee del set de imágenes de un dataset los nombres para emular que 
-#     se encuentran en la carpeta /data.
-#     """
-#     # file = open(f"{imagesets_dir}{ds}/{file}")
-#     file = open(file)
-#     names = [x+".jpg" for x in file.read().split("\n")[::-1]]
-#     return names
 
 class TomatoDatasetAdaptor:
     def __init__(self, images_dir_path, annotations_dataframe):
@@ -213,6 +194,12 @@ class EfficientDetDataset(Dataset):
         labels = sample["labels"]
 
         _, new_h, new_w = image.shape
+        # print(f"\nYOOO: \n{len(sample)}\n")
+        print(image_id)
+        # print(f"\nYOOO: \n{sample['bboxes']}\n")
+
+        print(f"\nYOOO: \n{sample['bboxes'][:, [0,1,2,3]]}\n")
+        # print(sample["bboxes"])
         sample["bboxes"][:, [0, 1, 2, 3]] = sample["bboxes"][
             :, [1, 0, 3, 2]
         ]  # convert to yxyx
@@ -245,7 +232,7 @@ class EfficientDetDataModule(LightningDataModule):
                 test_transforms=get_test_transforms(target_img_size=512),
                 pred_transforms=get_pred_transforms(target_img_size=512),
                 num_workers=8,
-                batch_size=4):
+                batch_size=1):
         
         self.train_ds = train_dataset_adaptor
         self.valid_ds = validation_dataset_adaptor
@@ -269,7 +256,7 @@ class EfficientDetDataModule(LightningDataModule):
         train_loader = torch.utils.data.DataLoader(
             train_dataset,
             batch_size=self.batch_size,
-            shuffle=True,
+            shuffle=False,
             pin_memory=True,
             drop_last=False,
             num_workers=self.num_workers,
@@ -323,7 +310,7 @@ class EfficientDetDataModule(LightningDataModule):
         pred_dataset = self.pred_dataset()
         pred_loader = torch.utils.data.DataLoader(
             pred_dataset,
-            batch_size=1,
+            batch_size=self.batch_size,
             shuffle=False,
             pin_memory=True,
             drop_last=False,
@@ -365,7 +352,7 @@ def load_dss(path,name):
     val_ds = TomatoDatasetAdaptor(images_path, df_vl)
     return train_ds, test_ds, val_ds
 
-def get_dm(train,val,test,pred,batch_size=2):
+def get_dm(train,val,test,pred,batch_size):
 # def get_dm(train,val,test,batch_size=2):
     return EfficientDetDataModule(train_dataset_adaptor=train, 
         validation_dataset_adaptor=val,
@@ -374,31 +361,20 @@ def get_dm(train,val,test,pred,batch_size=2):
         num_workers=4,
         batch_size=batch_size)
 
-def get_data(ds='801010',file="test.txt"):
-    # file = f"{imagesets_dir}{ds}/{file}"
-    file = file.split(".")[0]
-    if os.path.isfile(file):
+def get_data(ds='d801010',file="test"):
+    if len(os.listdir(data_dir))==0:
         return get_data_ds(read_imageset_names(ds,file))
     else:
         return get_data_ds(get_dir_imgs_names(data_dir))
 
-def get_dm_standalone(path=main_ds,name="d801010", data_file=None, batch_size=1):
+def get_dm_standalone(path=main_ds,name="d801010", data_file="test", batch_size=4):
     """
     Carga primero los Datasets con anotaciones y luego lee las imágenes de una carpeta
     para crear el dataset para predecir.
     """
     train, test, val = load_dss(path,name)
-    # pred = get_data_ds(get_dir_imgs_names(data_dir))
     pred = get_data(name,data_file)
     return get_dm(train,val,test,pred,batch_size)
-    # return get_dm(train,val,test,batch_size)
-
-# def get_dm2(name):
-#     train,test,val=load_dss(main_ds,name)
-#     return get_dm(train,val,test,2)
-
-# def get_dms_dss(dm):
-#     return dm.train_ds,dm.valid_ds,dm.test_ds
 
 def get_main_df(path=main_ds):
     dataset_path = Path(path)
