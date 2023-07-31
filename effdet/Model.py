@@ -78,21 +78,16 @@ def images_to_tensor(images, transform=get_valid_transforms(512)):
 
 
 # def run_wbf(predictions, image_size=512, iou_thr=0.44, skip_box_thr=0.2, weights=None):
-def run_wbf(predictions, image_size=512, iou_thr=0.55, skip_box_thr=0.2, weights=None):
+def run_wbf(predictions, image_size=512, iou_thr=0.44, skip_box_thr=0.43, weights=None):
     bboxes = []
     confidences = []
     class_labels = []
 
     for prediction in predictions:
         boxes = [(prediction["boxes"] / image_size).tolist()]
-        # boxes = [(prediction["boxes"]).tolist()]
         scores = [prediction["scores"].tolist()]
         labels = [prediction["classes"].tolist()]
-        # print(f"\nLen Boxes: {len(boxes)}\nBoxes(Pre): {boxes}")
-        # print(f"\nLen Scores: {len(scores)}\nScores: {scores}")
-        # boxes = boxes * (image_size - 1)
         boxes, scores, labels = ensemble_boxes_wbf.weighted_boxes_fusion(
-            # boxes * (image_size - 1),
             boxes,
             scores,
             labels,
@@ -104,7 +99,6 @@ def run_wbf(predictions, image_size=512, iou_thr=0.55, skip_box_thr=0.2, weights
         bboxes.append(boxes.tolist())
         confidences.append(scores.tolist())
         class_labels.append(labels.tolist())
-    # print("\nBoxes (Post): ",boxes)
     return bboxes, confidences, class_labels
 
 class EfficientDetModel(LightningModule):
@@ -112,10 +106,11 @@ class EfficientDetModel(LightningModule):
         self,
         num_classes=1,
         img_size=512,
-        prediction_confidence_threshold=0.01,
+        prediction_confidence_threshold=0.2,
         learning_rate=0.0002,
         wbf_iou_threshold=0.44,
-        inference_transforms=get_pred_transforms(target_img_size=512),
+        skip_thr=0.43,
+        inference_transforms=get_valid_transforms(target_img_size=512),
         model_architecture='tf_efficientnetv2_l',
         output_dir="./outputs/",
         # data_file=None,
@@ -131,6 +126,7 @@ class EfficientDetModel(LightningModule):
         self.wbf_iou_threshold = wbf_iou_threshold
         self.inference_tfms = inference_transforms
         self.output_dir = output_dir
+        self.skip_thr = skip_thr
         Path(output_dir).mkdir(parents=True, exist_ok=True)
         # self.data_file = data_file
 
@@ -167,8 +163,8 @@ class EfficientDetModel(LightningModule):
 
         return losses['loss']
 
-    # @torch.no_grad()
-    @torch.inference_mode()
+    @torch.no_grad()
+    # @torch.inference_mode()
     def validation_step(self, batch, batch_idx):
         images, annotations, targets, image_ids = batch
         # print("\nAnnotations: ", annotations)
@@ -193,8 +189,8 @@ class EfficientDetModel(LightningModule):
 
         return {'loss': outputs["loss"], 'batch_predictions': batch_predictions}
     
-    # @torch.no_grad()
-    @torch.inference_mode()
+    @torch.no_grad()
+    # @torch.inference_mode()
     def test_step(self, batch, batch_idx):
         image, annotations, targets, image_ids = batch
         outputs = self.model(image, annotations)
@@ -321,7 +317,7 @@ class EfficientDetModel(LightningModule):
             )
 
         predicted_bboxes, predicted_class_confidences, predicted_class_labels = run_wbf(
-            predictions, image_size=self.img_size, iou_thr=self.wbf_iou_threshold
+            predictions, image_size=self.img_size, iou_thr=self.wbf_iou_threshold, skip_box_thr=self.skip_thr
         )
 
         return predicted_bboxes, predicted_class_confidences, predicted_class_labels
@@ -330,7 +326,11 @@ class EfficientDetModel(LightningModule):
         boxes = detections.detach().cpu().numpy()[:, :4]
         scores = detections.detach().cpu().numpy()[:, 4]
         classes = detections.detach().cpu().numpy()[:, 5]
+        # Incluir aquí umbralización 
         indexes = np.where(scores > self.prediction_confidence_threshold)[0]
+        # media = (sum(scores)/len(scores))/2
+        # print("Media de las confianzas: ",media)
+        # indexes = np.where(scores > media)[0]
         boxes = boxes[indexes]
         return {"boxes": boxes, "scores": scores[indexes], "classes": classes[indexes]}
 
@@ -413,7 +413,7 @@ from objdetecteval.metrics.coco_metrics import get_coco_stats
 @patch
 def validation_epoch_end(self: EfficientDetModel, outputs):
     """Compute and log training loss and accuracy at the epoch level."""
-
+    print("Val\n")
     validation_loss_mean = torch.stack(
         [output["loss"] for output in outputs]
     ).mean()
@@ -493,8 +493,11 @@ def test_epoch_end(self: EfficientDetModel, outputs):
 def get_model():
     return EfficientDetModel()
 
-def load_checkpoint(path):
-    return EfficientDetModel.load_from_checkpoint(models_dir+"/"+path+".ckpt")
+# def load_checkpoint(path):
+    # return EfficientDetModel.load_from_checkpoint(models_dir+"/"+path+".ckpt")
+
+def load_checkpoint(model, path):
+    return model.load_from_checkpoint(models_dir+"/"+path+".ckpt")
 
 def load_ex_model(model, path):
     return model.load_state_dict(torch.load(models_dir+"/"+path+".pt"))
@@ -507,7 +510,17 @@ def load_ex_model(model, path):
 #         load_ex_model(model, path)
 #         return model
 
-def load_model(path="d801010"):
-    model = EfficientDetModel(num_classes=1, img_size=512)
-    load_ex_model(model, path)
+# def load_model(path="d801010",flag=0):
+#     model = EfficientDetModel(num_classes=1, img_size=512)
+#     if flag==0:
+#         load_ex_model(model, path)
+#     else:
+#         load_checkpoint(model, path)
+#     return model
+
+def load_model(name,conf, skip=0.43):
+    model = EfficientDetModel(num_classes=1, img_size=512, prediction_confidence_threshold=conf,
+        skip_thr=skip)
+    model.load_state_dict(torch.load(models_dir+"/"+name+".pt"))
     return model
+    
