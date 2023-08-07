@@ -20,34 +20,22 @@ def dir_path(path):
     return Path(path).mkdir(parents=True, exist_ok=True)
 
 def main():
+    """
+    $python CL_Train.py -e 40 -n d801010 -o bifpn/d801010 -s 1 -f 1
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument('-e', '--epochs', type=int, help="Número de épocas de entrenamiento.")
     parser.add_argument('-n','--name',type=str)
+    parser.add_argument('-o','--output',type=str)
     parser.add_argument('-s','--save',type=int, help="Flag para guardar el modelo entrenado.")
-    parser.add_argument('-r','--res',type=int, help="Flag para seguir entrenando desde un checkpoint.")
-    # parser.add_argument('-d','--debug',type=str, help="Flag para debuggear registrando el área de los bounding boxes.")
+    # parser.add_argument('-f','--freez',type=int)
+    
     args = parser.parse_args()
-    # dm = get_dm_standalone(main_ds,args.name)
-    dm = get_dm_standalone(name=args.name)
-    #DEBUG
-    # if args.debug :
-    #     data_file = open(args.debug,"w")
-    # else:
-    #     data_file = False
-    # data_file = False
-    # model = EfficientDetModel(data_file)
-    model = EfficientDetModel()
-    model_name = args.name
-    logger = TensorBoardLogger(logs_dir,name=model_name)
-    path = None if args.res==1 else get_ckpt(args.name)
-    train_model(model,dm,args.epochs,logger,None)
+    model = get_model()
+    train_model(model, args.name,args.epochs, args.output)
     if args.save==1:
-        torch.save(model.state_dict(),f"{models_dir}{model_name}.pt")
-    # if args.debug:
-        # data_file.close()
-        # save_hist(file_to_bboxes(args.debug),f"outputs/Áreas Training {name}.png",100)
-        
-
+        # torch.save(model.state_dict(),f"{models_dir}{args.output}.pt")
+        save_model(model,args.output)
         
 
 
