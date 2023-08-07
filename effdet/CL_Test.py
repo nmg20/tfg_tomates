@@ -3,22 +3,22 @@ from Model import *
 from Test import *
 import torch
 from pytorch_lightning import Trainer
-from pytorch_lightning.loggers import TensorBoardLogger
 import argparse
 import os
 
 models_dir = "modelos/"
 dataset_dir = "../../datasets/Tomato_1280x720/"
 
+"""
+$python CL_Test.py -n "d701515"
+(ruta al .pt, sin ./modelos delante y sin el .pt)
+"""
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-n','--name',type=str)
+    parser.add_argument('-m','--name',type=str)
     args = parser.parse_args()
-    dm = get_dm_standalone(dataset_dir,args.name)
-    # model = EfficientDetModel()
-    # load_ex_model(model,models_dir+args.name+".pt")
-    model = load_model(args.name)
-    logger = TensorBoardLogger("lightning_logs/tests",name=args.name+"_test")
-    test_model(model,dm,logger)
+    
+    test_model(args.name)
 if __name__=="__main__":
     main()
