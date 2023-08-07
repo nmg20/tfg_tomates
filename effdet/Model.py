@@ -106,11 +106,11 @@ class EfficientDetModel(LightningModule):
         self,
         num_classes=1,
         img_size=512,
-        prediction_confidence_threshold=0.2,
+        prediction_confidence_threshold=0.4,
         learning_rate=0.0002,
         wbf_iou_threshold=0.44,
         skip_thr=0.43,
-        inference_transforms=get_valid_transforms(target_img_size=512),
+        inference_transforms=get_pred_transforms(target_img_size=512),
         model_architecture='tf_efficientnetv2_l',
         output_dir="./outputs/",
         # data_file=None,
@@ -490,37 +490,45 @@ def test_epoch_end(self: EfficientDetModel, outputs):
 
     return {"test_loss": test_loss_mean, "metrics": stats}
 
-def get_model():
-    return EfficientDetModel()
+def get_model(layer=0):
+    return freeze(EfficientDetModel(),layer)
 
-# def load_checkpoint(path):
-    # return EfficientDetModel.load_from_checkpoint(models_dir+"/"+path+".ckpt")
-
-def load_checkpoint(model, path):
-    return model.load_from_checkpoint(models_dir+"/"+path+".ckpt")
-
-def load_ex_model(model, path):
-    return model.load_state_dict(torch.load(models_dir+"/"+path+".pt"))
-
-# def load_model(path="d801010"):
-#     model = EfficientDetModel(num_classes=1, img_size=512)
-#     if path+".ckpt" in os.listdir(models_dir):
-#         return load_checkpoint(path)
-#     else:
-#         load_ex_model(model, path)
-#         return model
-
-# def load_model(path="d801010",flag=0):
-#     model = EfficientDetModel(num_classes=1, img_size=512)
-#     if flag==0:
-#         load_ex_model(model, path)
-#     else:
-#         load_checkpoint(model, path)
-#     return model
-
-def load_model(name,conf, skip=0.43):
+def load_model(name,conf=0.2, skip=0.43):
     model = EfficientDetModel(num_classes=1, img_size=512, prediction_confidence_threshold=conf,
         skip_thr=skip)
     model.load_state_dict(torch.load(models_dir+"/"+name+".pt"))
     return model
-    
+
+def save_model(model, output):
+    torch.save(model.state_dict(), f"{models_dir}/{output}.pt")
+
+
+# Estructura de EfficientDet
+# - EfficientDet
+#     - EfficientNetFeatures
+#     - BiFpn
+#     - HeadNet <- cabeza de las bounding boxes
+#     - HeadNet <- cabeza de las clases
+# - Anchors
+# - DetectionLoss
+#
+#
+#
+
+def freeze(model, layer_min=0, layer_max=4):
+    """
+    Localiza las últimas dos capas de la estructura principal de EfficientDet:
+    las dos cabezas de predicción de bboxes y clases, para congelar
+    los parámetros del resto de capas.
+    bifpn = min=2, max=3
+    head = min=3, max=4
+    nada = min=0, max=4
+    """
+    layers = 0
+    for children in model.children():
+        for children2 in children.children():
+            for child in children2.children():
+                layers += 1
+                if layers<layer_min or layers>layer_max:
+                    for param in child.parameters():
+                        param.requires_grad = False
