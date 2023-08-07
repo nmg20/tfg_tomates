@@ -46,9 +46,11 @@ def draw_pascal_voc_bboxes(
             fill=False,
         ))
 
-def draw_bboxes_confs(plot_ax, bboxes, confs=None,
+def draw_bboxes_confs(plot_ax, bboxes,confs=None, linewidth=2,
     get_rectangle_corners_fn=get_rectangle_edges_from_pascal_bbox,
 ):
+    # print(len(bboxes), len(confs))
+    # print("\nConfs (Draw_Boxes)",confs,"\n")
     for i in range(len(bboxes)):
         bottom_left, width, height = get_rectangle_corners_fn(bboxes[i])
         (x1,y1),(x2,y2) = edges(bboxes[i])
@@ -56,13 +58,14 @@ def draw_bboxes_confs(plot_ax, bboxes, confs=None,
             bottom_left,
             width,
             height,
-            linewidth=2,
+            linewidth=linewidth,
             edgecolor="orange",
             fill=False,
         ))
         if confs:
+            # print(confs[0][i])
             plot_ax.text(bottom_left[0]+0.5*width,y2,
-                str(confs[0][i])[0:4], fontsize=12,
+                str(confs[i])[0:4], fontsize=8,
             horizontalalignment='center',
             verticalalignment='top',color="orange")
 
@@ -75,9 +78,6 @@ def draw_ax(ax, img, bboxes, confs, loss, name):
     draw_bboxes_confs(ax, bboxes, confs)
     ax.title.set_text(f'name: {loss}')
 
-def draw_subplots(image, bboxes, confs, loss, names):
-    fig, 
-
 def draw_images(image, bboxes, confs, loss, name, annots=None):
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20,20))
     fig.suptitle(f"Inferencia - Loss: {loss}.", fontsize=16)
@@ -88,16 +88,32 @@ def draw_images(image, bboxes, confs, loss, name, annots=None):
     plt.savefig(f"{name}.png")
     plt.close(fig)
 
+##############################################
+
+def draw_image(image, bboxes, confs, loss, name):
+    fig, ax = plt.subplots()
+    fig.suptitle(f"Inferencia - Loss: {loss}.", fontsize=16)
+    ax.imshow(image)
+    # print("\nConfs (Draw_Image)",confs,"\n")
+    draw_bboxes_confs(ax, bboxes[0], confs, linewidth=1)
+    plt.savefig(f"{name}.png")
+    plt.close(fig)
+
+###############################################
+
 def draw_images_stacked(image, bboxes, confs, loss, name, annots=None):
     fig, axs = plt.subplots(2, figsize=(20,20))
-    fig.suptitle(f"Inferencia - Loss: {loss}.", fontsize=20)
+    # fig.suptitle(f"Loss: {loss}\n", fontsize=20)
+    fig.suptitle(f"Loss: {loss[0]}\nConfianza media: {loss[1]}.", fontsize=20)
+    # fig.suptitle(f"Inferencia - Loss: {loss}.", fontsize=20)
     axs[0].imshow(image)
     axs[0].set_title("Imagen predecida")
     draw_bboxes_confs(axs[0],bboxes[0],confs)
     axs[1].imshow(image)
     axs[1].set_title("Imagen anotada")
     draw_bboxes_confs(axs[1],annots,None)
-    plt.savefig(f"{name}.png")
+    # plt.savefig(f"{name}.png")
+    plt.savefig(f"{name}")
     plt.close(fig)
 
 def draw_losses(losses, mean, name):
