@@ -32,11 +32,13 @@ def main():
     #$python CL_Inference.py -m d801010 -f test.txt
     parser = argparse.ArgumentParser()
     parser.add_argument('-m', '--model', type=str, help="Número de épocas de entrenamiento.")
-    parser.add_argument('-f', '--file', type=str, help="Fichero del que leer los nombres de las imágenes.")
-    # parser.add_argument('-l', '--loss', type=int, help="Flag para que la inferenci sólo registre la loss para cada imagen.")
+    parser.add_argument('-o', '--output', type=str, help="Nombre de la carpeta a crear con los resultados.")
+    parser.add_argument('-c', '--conf', type=float, help="Flag para que la inferenci sólo registre la loss para cada imagen.")
+    parser.add_argument('-s', '--skip', type=float, help="Flag para que la inferenci sólo registre la loss para cada imagen.")
 
     args = parser.parse_args()
-    inference(args.model, args.file)
+    # inference_simple(args.model)
+    inference(args.model, args.output, args.conf, args.skip)
 
 if __name__=="__main__":
     main()
