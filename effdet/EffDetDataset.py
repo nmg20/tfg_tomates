@@ -9,6 +9,10 @@ from Dataset_Analysis import read_imageset_names, Image
 from pathlib import Path
 from utils.config import *
 
+NUM_WORKERS = 8
+# NUM_WORKERS = 1
+BATCH_SIZE = 4
+
 def read_anots(image):
     df = pd.read_csv(imagesets_dir+"all_annotations.csv")
     return df[df.image==image.filename.split("/")[-1]][["xmin", "ymin", "xmax", "ymax"]].values
@@ -43,14 +47,14 @@ class TomatoDatasetAdaptor:
         show_image(image, bboxes.tolist())
         print(class_labels)
 
-class TomatoDatasetPredAdaptor:
-    def __init__(self, images_dir_path):
-        self.images_dir_path = Path(images_dir_path)
+# class TomatoDatasetPredAdaptor:
+#     def __init__(self, images_dir_path):
+#         self.images_dir_path = Path(images_dir_path)
 
-    def get_image_by_idx(self, index):
-        image_name = self.images[index]
-        image = Image.open(self.images_dir_path / image_name)
-        return image
+#     def get_image_by_idx(self, index):
+#         image_name = self.images[index]
+#         image = Image.open(self.images_dir_path / image_name)
+#         return image
 
 
 from torch.utils.data import Dataset
@@ -70,16 +74,16 @@ def denormalize(tensor):
 def get_train_transforms(target_img_size=512):
     return A.Compose(
         [
-            A.Blur(blur_limit=3, p=0.5),
-            A.HorizontalFlip(p=0.5),
-            A.VerticalFlip(p=0.5),
-            A.Transpose(p=0.5),
-            A.RandomScale(p=0.3),
-            A.SafeRotate(p=0.5),
-            # A.augmentations.crops.transforms.BBoxSafeRandomCrop(p=0.5),
-            transforms.ColorJitter(brightness=0.2),
-            transforms.ColorJitter(contrast=0.2),
-            transforms.ColorJitter(saturation=0.3),
+            # A.Blur(blur_limit=3, p=0.5),
+            # A.HorizontalFlip(p=0.5),
+            # A.VerticalFlip(p=0.5),
+            # A.Transpose(p=0.5),
+            # A.RandomScale(p=0.3),
+            # A.SafeRotate(p=0.5),
+            # # A.augmentations.crops.transforms.BBoxSafeRandomCrop(p=0.5),
+            # transforms.ColorJitter(brightness=0.2),
+            # transforms.ColorJitter(contrast=0.2),
+            # transforms.ColorJitter(saturation=0.3),
             # transforms.Equalize(mode='pil',by_channels=True),
             A.Resize(height=target_img_size, width=target_img_size, p=1),
             A.Normalize(mean, std),
@@ -94,15 +98,15 @@ def get_train_transforms(target_img_size=512):
 def get_valid_transforms(target_img_size=512):
     return A.Compose(
         [
-            A.Blur(blur_limit=3, p=0.5),
-            A.HorizontalFlip(p=0.5),
-            A.VerticalFlip(p=0.5),
-            A.Transpose(p=0.5),
-            A.RandomScale(p=0.3),
-            A.SafeRotate(p=0.5),
-            transforms.ColorJitter(brightness=0.2),
-            transforms.ColorJitter(contrast=0.2),
-            transforms.ColorJitter(saturation=0.3),
+            # A.Blur(blur_limit=3, p=0.5),
+            # A.HorizontalFlip(p=0.5),
+            # A.VerticalFlip(p=0.5),
+            # A.Transpose(p=0.5),
+            # A.RandomScale(p=0.3),
+            # A.SafeRotate(p=0.5),
+            # transforms.ColorJitter(brightness=0.2),
+            # transforms.ColorJitter(contrast=0.2),
+            # transforms.ColorJitter(saturation=0.3),
             # transforms.Equalize(mode='pil',by_channels=True),
             A.Resize(height=target_img_size, width=target_img_size, p=1),
             A.Normalize(mean, std),
@@ -117,16 +121,19 @@ def get_valid_transforms(target_img_size=512):
 def get_test_transforms(target_img_size=512):
     return A.Compose(
         [
-            A.Blur(blur_limit=3, p=0.5),
-            A.HorizontalFlip(p=0.5),
-            A.VerticalFlip(p=0.5),
-            A.Transpose(p=0.5),
-            A.RandomScale(p=0.3),
-            A.SafeRotate(p=0.5),
-            transforms.ColorJitter(brightness=0.2),
-            transforms.ColorJitter(contrast=0.2),
-            transforms.ColorJitter(saturation=0.3),
-            # transforms.Equalize(mode='pil',by_channels=True),
+            A.Resize(height=target_img_size, width=target_img_size, p=1),
+            A.Normalize(mean, std),
+            ToTensorV2(p=1),
+        ],
+        p=1.0,
+        bbox_params=A.BboxParams(
+            format="pascal_voc", min_area=0, min_visibility=0, label_fields=["labels"]
+        ),
+    )
+
+def get_pred_transforms(target_img_size=512):
+    return A.Compose(
+        [
             A.Resize(height=target_img_size, width=target_img_size, p=1),
             A.Normalize(mean, std),
             ToTensorV2(p=1),
@@ -138,32 +145,23 @@ def get_test_transforms(target_img_size=512):
     )
 
 # def get_pred_transforms(target_img_size=512):
-#     return tfs.Compose(
+#     return A.Compose(
 #         [
-#             tfs.Resize((target_img_size,target_img_size)),
-#             tfs.ToTensor(),
-#             tfs.Normalize(mean, std),
-#         ]
+#             A.Blur(blur_limit=3, p=0.5),
+#             A.HorizontalFlip(p=0.5),
+#             A.VerticalFlip(p=0.5),
+#             A.Transpose(p=0.5),
+#             A.RandomScale(p=0.3),
+#             A.SafeRotate(p=0.5),
+#             A.Resize(height=target_img_size,width=target_img_size,p=1),
+#             A.Normalize(mean, std),
+#             ToTensorV2(p=1),
+#         ],
+#         p=1.0,
+#         bbox_params=A.BboxParams(
+#             format="pascal_voc", min_area=0, min_visibility=0, label_fields=["labels"]
+#         ),
 #     )
-
-def get_pred_transforms(target_img_size=512):
-    return A.Compose(
-        [
-            A.Blur(blur_limit=3, p=0.5),
-            A.HorizontalFlip(p=0.5),
-            A.VerticalFlip(p=0.5),
-            A.Transpose(p=0.5),
-            A.RandomScale(p=0.3),
-            A.SafeRotate(p=0.5),
-            A.Resize(height=target_img_size,width=target_img_size,p=1),
-            A.Normalize(mean, std),
-            ToTensorV2(p=1),
-        ],
-        p=1.0,
-        bbox_params=A.BboxParams(
-            format="pascal_voc", min_area=0, min_visibility=0, label_fields=["labels"]
-        ),
-    )
 
 
 class EfficientDetDataset(Dataset):
@@ -194,15 +192,9 @@ class EfficientDetDataset(Dataset):
         labels = sample["labels"]
 
         _, new_h, new_w = image.shape
-        # print(f"\nYOOO: \n{len(sample)}\n")
-        print(image_id)
-        # print(f"\nYOOO: \n{sample['bboxes']}\n")
-
-        print(f"\nYOOO: \n{sample['bboxes'][:, [0,1,2,3]]}\n")
-        # print(sample["bboxes"])
-        sample["bboxes"][:, [0, 1, 2, 3]] = sample["bboxes"][
-            :, [1, 0, 3, 2]
-        ]  # convert to yxyx
+        # print(f"\n{sample['bboxes']}\n")
+        sample["bboxes"][:, [0, 1, 2, 3]] = [sample["bboxes"][
+            :, [1, 0, 3, 2]]][0]  # convert to yxyx
 
         target = {
             "bboxes": torch.as_tensor(sample["bboxes"], dtype=torch.float32),
@@ -231,8 +223,8 @@ class EfficientDetDataModule(LightningDataModule):
                 valid_transforms=get_valid_transforms(target_img_size=512),
                 test_transforms=get_test_transforms(target_img_size=512),
                 pred_transforms=get_pred_transforms(target_img_size=512),
-                num_workers=8,
-                batch_size=1):
+                num_workers=NUM_WORKERS,
+                batch_size=BATCH_SIZE):
         
         self.train_ds = train_dataset_adaptor
         self.valid_ds = validation_dataset_adaptor
@@ -339,10 +331,11 @@ class EfficientDetDataModule(LightningDataModule):
 
         return images, annotations, targets, image_ids
 
-def load_dss(path,name):
+def load_dss(name,path=main_ds):
     dataset_path = Path(path)
     images_path = dataset_path/"JPEGImages"
     dfs_path = dataset_path/"ImageSets"/name
+    # print(dfs_path)
     df_tr = pd.read_csv(dfs_path/"labelstrain.csv")
     df_ts = pd.read_csv(dfs_path/"labelstest.csv")
     df_vl = pd.read_csv(dfs_path/"labelsval.csv")
@@ -352,29 +345,25 @@ def load_dss(path,name):
     val_ds = TomatoDatasetAdaptor(images_path, df_vl)
     return train_ds, test_ds, val_ds
 
-def get_dm(train,val,test,pred,batch_size):
-# def get_dm(train,val,test,batch_size=2):
-    return EfficientDetDataModule(train_dataset_adaptor=train, 
-        validation_dataset_adaptor=val,
-        test_dataset_adaptor=test,
-        pred_dataset_adaptor=pred,
-        num_workers=4,
-        batch_size=batch_size)
-
 def get_data(ds='d801010',file="test"):
     if len(os.listdir(data_dir))==0:
         return get_data_ds(read_imageset_names(ds,file))
     else:
         return get_data_ds(get_dir_imgs_names(data_dir))
 
-def get_dm_standalone(path=main_ds,name="d801010", data_file="test", batch_size=4):
+def get_dm(name="d801010", data_file="test", batch_size=BATCH_SIZE):
     """
     Carga primero los Datasets con anotaciones y luego lee las imágenes de una carpeta
     para crear el dataset para predecir.
     """
-    train, test, val = load_dss(path,name)
+    train, test, val = load_dss(name,main_ds)
     pred = get_data(name,data_file)
-    return get_dm(train,val,test,pred,batch_size)
+    return EfficientDetDataModule(train_dataset_adaptor=train, 
+        validation_dataset_adaptor=val,
+        test_dataset_adaptor=test,
+        pred_dataset_adaptor=pred,
+        num_workers=NUM_WORKERS,
+        batch_size=BATCH_SIZE)
 
 def get_main_df(path=main_ds):
     dataset_path = Path(path)

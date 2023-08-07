@@ -35,6 +35,18 @@ def save_hist(data, name, nbins=None):
     plt.savefig(name)
     plt.close()
 
+def save_hist2(data, name, confs=False):
+    fig, ax = plt.subplots(figsize=(20,20))
+    hist, bins = np.histogram(data, 
+        bins=np.linspace(np.min(data),np.max(data)), density=True)
+    plt.hist(data, bins)
+    if confs:
+        plt.title("Distribución de los porcentajes de confianza de las bounding boxes")
+    else:
+        plt.title("Distribución del área de las bounding boxes")
+    plt.savefig(name)
+    plt.close()
+
 """
 Pensar si coger las bboxes del csv o después de ser transformadas.
 -> cambio de tamaño.
