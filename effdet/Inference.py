@@ -96,7 +96,7 @@ def infere(model, name, ds, output):
         save_hist(area_bboxes(bboxes), confs, area_bboxes(ann), f"{out}/hists_{name1}.png")
 
 def inference(model_name, output_name, cnf=0.1, sk=0.2):
-    name = model_name.split("/")[-1]
+    name = model_name.split("/")[-1].split("_")[0]
     dm = get_dm(name=name)
     if cnf<0 or sk<0:
         model = EfficientDetModel()
