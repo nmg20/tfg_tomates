@@ -1,5 +1,5 @@
 from pytorch_lightning import Trainer 
-from utils.config import logs_dir
+from config import logs_dir
 from Model import EfficientDetModel
 from EffDetDataset import get_dm
 import os
@@ -25,12 +25,11 @@ def train(model,dm,num_epochs,logger):
         num_sanity_val_steps=1, logger=logger)
     trainer.fit(model, dm)
 
-def train_model(model, name, num_epochs, output):
+def train_model(model, dm, num_epochs, output):
     """
     Prepara los parámetros para entrenar el modelo.
     """
     logger = TensorBoardLogger(logs_dir,name=output)
-    dm = get_dm(name=name)
     train(model, dm, num_epochs, logger)
 
 def resume_train(model, dm, num_epochs, logger, path):
