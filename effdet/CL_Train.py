@@ -32,7 +32,8 @@ def main():
     
     args = parser.parse_args()
     model = get_model()
-    train_model(model, args.name,args.epochs, args.output)
+    dm = get_dm(name=args.name)
+    train_model(model, dm, args.epochs, args.output)
     if args.save==1:
         # torch.save(model.state_dict(),f"{models_dir}{args.output}.pt")
         save_model(model,args.output)
