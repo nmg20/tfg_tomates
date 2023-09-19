@@ -29,7 +29,7 @@ def main():
     
         -> añadir un flag para simplemente registrar la loss.
     """
-    #$python CL_Inference.py -m d801010 -f test.txt
+    #$python CL_Inference.py -m d801010 -o retrain/bifpn -c 0.1 -s 0.2
     parser = argparse.ArgumentParser()
     parser.add_argument('-m', '--model', type=str, help="Número de épocas de entrenamiento.")
     parser.add_argument('-o', '--output', type=str, help="Nombre de la carpeta a crear con los resultados.")
