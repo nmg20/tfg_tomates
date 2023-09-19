@@ -19,6 +19,8 @@ o sino tambien:
 # ImportError: cannot import name 'get_num_classes' 
 # get_num_classes está deprecado
 
+# La solución está en reinstalar torchmetrics en la versión 0.6.0
+
 !pip install -U pytorch-lightning
 
 # Posible solución: Instalar pytorch-lightning desde github
