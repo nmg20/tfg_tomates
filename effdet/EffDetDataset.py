@@ -4,10 +4,10 @@ import torch
 import os
 torch.manual_seed(17)
 import pandas as pd
-from utils import Visualize, dataset_to_csv
+from utils import dataset_to_csv
 from Dataset_Analysis import read_imageset_names, Image
 from pathlib import Path
-from utils.config import *
+from config import *
 
 NUM_WORKERS = 8
 # NUM_WORKERS = 1
