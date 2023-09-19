@@ -7,7 +7,7 @@ import os
 import torchvision.transforms as T
 import pandas as pd
 import sys
-from utils.config import *
+from config import *
 from scipy.stats import ttest_ind, ttest_rel
 
 def area_bbox(bbox):
@@ -20,18 +20,20 @@ def get_hist(data, nBins=500):
     hist, bins, _ = plt.hist(data, nBins)
     return hist
 
-def save_hist(data, name, nbins=None):
+def save_hist(data, name, title=None, nbins=None):
     """
     Recibe una lista anidada (confianzas de las predicciones o los
     bounding boxes), la aplana, dibuja su histograma y lo guarda.
     """
     fig, ax = plt.subplots(figsize=(20,20))
+    ax.margins(x=0)
     if not nbins:
         bins = np.linspace(np.min(data),np.max(data))
     else:
         bins = list(range(0,np.max(data),nbins))
-    plt.hist(data, bins)
-    plt.title("Distribución del área de las bounding boxes")
+    # plt.hist(data, bins)
+    plt.hist(data, bins="auto",density=True)
+    plt.title(title)
     plt.savefig(name)
     plt.close()
 
@@ -46,7 +48,7 @@ def save_hist2(data, name, confs=False):
         plt.title("Distribución del área de las bounding boxes")
     plt.savefig(name)
     plt.close()
-
+    
 """
 Pensar si coger las bboxes del csv o después de ser transformadas.
 -> cambio de tamaño.
