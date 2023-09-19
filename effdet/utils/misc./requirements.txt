@@ -2,6 +2,7 @@ albumentations==1.0.0
 effdet==0.2.4
 ensemble-boxes==1.0.6
 fastcore==1.3.20
-pytorch-lightning==1.3.5
+pytorch-lightning==1.4.4
 timm==0.4.9
-torch==1.8.1
+torch==1.13.1
+torchmetrics==0.6.0

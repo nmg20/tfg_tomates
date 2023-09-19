@@ -10,7 +10,8 @@ import glob
 import pandas as pd
 import xml.etree.ElementTree as ET
 
-dssrc = "T1280x720_test/"
+# dssrc = "T1280x720_test/"
+dssrc = "T1280x720/"
 
 """
 Idea: 1 argumento (la carpeta del ds original)
