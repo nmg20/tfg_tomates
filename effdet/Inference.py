@@ -29,9 +29,9 @@ def file_to_bboxes(file):
     f = open(file,"r")
     return [[float(x) for x in bbox.split(" ") if len(x)>1] for bbox in f.read().strip().replace("[","").replace("]","").split("\n")]
 
-def imageset_to_pil(ds="801010",name="test.txt"):
+def imageset_to_pil(ds="d801010",name="test.txt"):
     names = read_imageset_names(ds)
-    images = [Image.open(x) for x in os.listdir(images_dir) if x in names]
+    images = [Image.open(f"{main_ds}JPEGImages/{x}") for x in os.listdir(images_dir) if x in names]
     return images
 
 # def inference_ds(model, name, ds):
