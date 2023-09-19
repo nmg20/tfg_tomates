@@ -21,10 +21,10 @@ from pytorch_lightning import LightningModule
 from ensemble_boxes import ensemble_boxes_wbf
 
 from effdet.config.model_config import efficientdet_model_param_dict
-from effdet import get_efficientdet_config, EfficientDet, DetBenchTrain
+from effdet import get_efficientdet_config, EfficientDet, DetBenchTrain, DetBenchPredict
 from effdet.efficientdet import HeadNet
 from effdet.config.model_config import efficientdet_model_param_dict
-from utils.config import *
+from config import *
 import timm
 from EffDetDataset import *
 import matplotlib.pyplot as plt
@@ -48,20 +48,7 @@ def create_model(num_classes=1, image_size=512, architecture="tf_efficientnetv2_
         num_outputs=config.num_classes,
     )
     return DetBenchTrain(net, config)
-
-# def bbox_area(bbox):
-#     return abs((bbox[2]-bbox[0])*(bbox[3]-bbox[1]))
-
-# def bboxes_area(bboxes):
-#     return [bbox_area(x) for x in bboxes]
-
-# def save_sizes(bboxes, file):
-#     for bbox in bboxes:
-#         file.write(f"{bbox_area(bbox)}\n")
-
-# def save_anots(bboxes, file):
-#     for bbox in bboxes:
-#         file.write(f"{bbox}\n")
+    # return DetBenchPredict(net, config)
 
 def images_to_tensor(images, transform=get_valid_transforms(512)):
     image_sizes = [(image.size[1], image.size[0]) for image in images]
@@ -75,7 +62,6 @@ def images_to_tensor(images, transform=get_valid_transforms(512)):
             for image in images
         ]
     ), image_sizes
-
 
 # def run_wbf(predictions, image_size=512, iou_thr=0.44, skip_box_thr=0.2, weights=None):
 def run_wbf(predictions, image_size=512, iou_thr=0.44, skip_box_thr=0.43, weights=None):
@@ -113,14 +99,12 @@ class EfficientDetModel(LightningModule):
         inference_transforms=get_pred_transforms(target_img_size=512),
         model_architecture='tf_efficientnetv2_l',
         output_dir="./outputs/",
-        # data_file=None,
     ):
         super().__init__()
         self.img_size = img_size
         self.model = create_model(
             num_classes, img_size, architecture=model_architecture
         )
-        # self.dropout = nn.Dropout()
         self.prediction_confidence_threshold = prediction_confidence_threshold
         self.lr = learning_rate
         self.wbf_iou_threshold = wbf_iou_threshold
@@ -128,15 +112,6 @@ class EfficientDetModel(LightningModule):
         self.output_dir = output_dir
         self.skip_thr = skip_thr
         Path(output_dir).mkdir(parents=True, exist_ok=True)
-        # self.data_file = data_file
-
-    # @auto_move_data
-    # def forward(self, images, targets):
-    #     output = self.model(images, targets)
-    #     loss = 0
-    #     if targets:
-    #         loss = CE(output, targets)
-    #     return loss, output
     
     def forward(self, images, targets):
         return self.model(images, targets)
@@ -521,6 +496,7 @@ def freeze(model, layer_min=0, layer_max=4):
     las dos cabezas de predicción de bboxes y clases, para congelar
     los parámetros del resto de capas.
     bifpn = min=2, max=3
+    bifpn + head = min=2, max=4
     head = min=3, max=4
     nada = min=0, max=4
     """
