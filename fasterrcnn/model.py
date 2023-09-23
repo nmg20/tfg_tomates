@@ -1,6 +1,6 @@
 from torchvision.io.image import read_image
 from torchvision.models.detection import fasterrcnn_resnet50_fpn_v2, FasterRCNN_ResNet50_FPN_V2_Weights
-from torchvision.models.detection.faster_rcnn import FasterRCNNPredictor
+from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision.utils import draw_bounding_boxes
 from torchvision.transforms.functional import to_pil_image
 import os
@@ -23,13 +23,18 @@ class FasterRCNNModel(LightningModule):
         # inference_transforms=get_pred_transforms(target_img_size=512),
     ):
         super().__init__()
-        self.detector = fasterrcnn_resnet50_fpn_v2(weights=FasterRCNN_ResNet50_FPN_V2_Weights.DEFAULT)
-        self.predictor = FasterRCNNPredictor(in_channels=3, num_classes=num_classes)
+        model = create_model(num_classes)
         self.lr = learning_rate
 
-    def forward(self, images, targets):
-        self.detector.eval()
-        return self.detector(images, targets)
+    def create_model(self, num_classes=1):
+        model = fasterrcnn_resnet50_fpn_v2(weights=FasterRCNN_ResNet50_FPN_V2_Weights.DEFAULT)
+        in_features = model.roi_heads.box_predictor.cls_score.in_features
+        model.roi_heads.box_predictor = FastRCNNPredictor(in_features=in_features, num_classes=1)
+        return model
+
+    def forward(self, images):
+        self.model.eval()
+        return self.model(images)
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(),
@@ -38,6 +43,7 @@ class FasterRCNNModel(LightningModule):
 
     def training_step(self, batch, batch_idx):
         images, annotations, labels, _ = batch
+        loss_dict = self.model(images, )
         outputs = self.detector(images, annotations)
         loss = F.cross_entropy(outputs, bboxes)
         self.training_step_outputs.append(outputs)
