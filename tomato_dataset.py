@@ -49,11 +49,12 @@ def get_basic_transform():
         A.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
         ToTensorV2(p=1),
     ],
-    p=1.0,
-    bbox_params=A.BboxParams(
-        format="pascal_voc", min_area=0, min_visibility=0,
-        label_fields=["labels"])
+    # p=1.0,
+    # bbox_params=A.BboxParams(
+    #     format="pascal_voc", min_area=0, min_visibility=0,
+    #     label_fields=["labels"])
     )
+    # return T.ToTensor()
 
 class TomatoDataset(Dataset):
     """
@@ -79,12 +80,19 @@ class TomatoDataset(Dataset):
             "labels": class_labels,
         }
         sample = self.transforms(**sample)
-        image = torch.as_tensor(sample["image"], dtype=torch.float32)
-        sample["bboxes"][:, [0,1,2,3]] = [sample["bboxes"][
-            :, [1, 0, 3, 2]]][0] #intercambiar xxyy a yxyx
-        bboxes = torch.as_tensor(np.array(sample["bboxes"]))
-        labels = torch.as_tensor(sample["labels"])
-        return image, bboxes, labels
+        sample["bboxes"] = np.array(sample["bboxes"])
+        image = sample["image"]
+        pascal_bboxes = sample["bboxes"]
+        labels = sample["labels"]
+
+        sample["bboxes"][:,[0, 1, 2, 3]] = [sample["bboxes"][
+            :, [1, 0, 3, 2]]][0]
+        target = {
+            "bboxes": torch.as_tensor(sample["bboxes"], dtype=torch.float32),
+            "labels": torch.as_tensor(labels),
+        }
+        return image, target
+
 
 class TomatoDataModule(pl.LightningDataModule):
     """
@@ -97,6 +105,7 @@ class TomatoDataModule(pl.LightningDataModule):
     def __init__(self, dfs_path, images_path, batch_size, num_workers):
         self.train_df_path = f"{dfs_path}/labelstrain.csv"
         self.val_dataframe = f"{dfs_path}/labelsval.csv"
+        self.test_dataframe = f"{dfs_path}/labelstest.csv"
         self.images_path = images_path
         self.batch_size = batch_size
         self.num_workers = num_workers
@@ -105,7 +114,7 @@ class TomatoDataModule(pl.LightningDataModule):
     def train_dataset(self) -> TomatoDataset:
         return TomatoDataset(
             adaptor = TomatoDatasetAdaptor(
-                self.images_path,self.train_df_path)
+                self.images_path, self.train_df_path)
             )
 
     def train_dataloader(self) -> DataLoader:
@@ -114,15 +123,16 @@ class TomatoDataModule(pl.LightningDataModule):
             train_dataset,
             batch_size = self.batch_size,
             shuffle = True,
+            pin_memory = True,
             num_workers = self.num_workers,
-            # collate_fn = self.collate_fn,
+            collate_fn = self.collate_fn,
         )
         return train_loader
 
     def val_dataset(self) -> TomatoDataset:
         return TomatoDataset(
             adaptor = TomatoDatasetAdaptor(
-                self.images_path,self.val_df_path)
+                self.images_path, self.val_df_path)
             )
 
     def val_dataloader(self) -> DataLoader:
@@ -130,68 +140,132 @@ class TomatoDataModule(pl.LightningDataModule):
         val_loader = torch.utils.data.DataLoader(
             val_dataset,
             batch_size = self.batch_size,
-            shuffle = True,
+            shuffle = False,
+            pin_memory = True,
             num_workers = self.num_workers,
-            # collate_fn = self.collate_fn,
+            collate_fn = self.collate_fn,
         )
         return val_loader
 
+    def test_dataset(self) -> TomatoDataset:
+        return TomatoDataset(
+            adaptor = TomatoDatasetAdaptor(
+                self.images_path, self.test_df_path)
+            )
+
+    def test_dataloader(self) -> DataLoader:
+        test_dataset = self.test_dataset()
+        test_loader = torch.utils.data.DataLoader(
+            test_dataset,
+            batch_size = self.batch_size,
+            shuffle = False,
+            pin_memory = True,
+            num_workers = self.num_workers,
+            collate_fn = self.collate_fn,
+        )
+        return test_loader
+
+    @staticmethod
+    def collate_fn(batch):
+        images, targets = tuple(zip(*batch))
+        images = torch.stack(images)
+        images = images.float()
+
+        boxes = [target["bboxes"].float() for target in targets]
+        labels = [target["labels"].float() for target in targets]
+       
+        annotations = {
+            "bboxes": boxes,
+            "cls": labels,
+        }
+        return images, annotations
+
 from torchvision.models.detection import FasterRCNN
 from torchvision.models.detection.rpn import AnchorGenerator
-from torchvision.models.detection import fasterrcnn_resnet50_fpn_v2, FasterRCNN_ResNet50_FPN_V2_Weights
+from torchvision.models.detection import fasterrcnn_resnet50_fpn, FasterRCNN_ResNet50_FPN_Weights
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
+from torchvision.models.detection.backbone_utils import resnet_fpn_backbone
+import torchvision
 
-def create_model(self, num_classes=1):
-    """
-    Función para crear el modelo FasterRCNN con los pesos por defecto,
-    adaptando las características del predictor del módulo al número de clases.
-    """
-    model = fasterrcnn_resnet50_fpn_v2(weights=FasterRCNN_ResNet50_FPN_V2_Weights.DEFAULT)
-    in_features = model.roi_heads.box_predictor.cls_score.in_features
-    model.roi_heads.box_predictor = FastRCNNPredictor(in_channels=in_features, num_classes=1)
-    return model
+# def create_model(num_classes=1):
+#     """
+#     Función para crear el modelo FasterRCNN con los pesos por defecto,
+#     adaptando las características del predictor del módulo al número de clases.
+#     """
+#     model = fasterrcnn_resnet50_fpn_v2(weights=FasterRCNN_ResNet50_FPN_V2_Weights.DEFAULT)
+#     in_features = model.roi_heads.box_predictor.cls_score.in_features
+#     model.roi_heads.box_predictor = FastRCNNPredictor(in_channels=in_features, num_classes=1)
+#     return model
 
 class FasterRCNNThres(FasterRCNN):
     """
     Modificación de FasterRCNN con una variable entrenable a modo de 
     umbral de resultados.
     """
-    # def __init__(self, backbone, num_classes, init_threshold=0.5):
-    #     super().__init__(backbone, num_classes)
-    #     self.model = create_model(num_classes)
-    #     self.threshold = nn.Parameter(torch.tensor(init_threshold), requires_grad=True)
-
-    def __init__(self, backbone, num_classes, thres=0.5):
-        super().__init__(backbone, num_classes)
-        self.model = FasterRCNN(backbone, num_classes)
-        self.threshold = nn.Parameter(torch.tensor(thres), requires_grad=True)
+    def __init__(self, backbone, num_classes):
+        super().__init__(backbone, num_classes, 
+            rpn_anchor_generator = AnchorGenerator(
+                sizes=((32, 64, 128, 256, 512),), 
+                aspect_ratios=((0.5, 1.0, 2.0),) * 5)
+            ,
+            box_roi_pooler = torchvision.ops.MultiScaleRoIAlign(
+                featmap_names=['0'],
+                output_size=7,
+                sampling_ratio=2)
+            )
+        self.threshold = torch.nn.Sigmoid()
 
     def forward(self, images, targets=None):
-        if self.training:
-            return self.model(images, targets)
-        else:
-            outputs, scores = self.mode(images)
-            thresholded = self.threshold + scores.shape[0]*0.5
-            indices = torch.nonzero(scores > thresholded).squeeze()
-            return outputs[indices]
+        outputs = super().forward(images, targets)
+        if not self.training or targets is None:
+            outputs[0]['scores'] = self.threshold(outputs[0]['scores'])
+        return outputs
 
 class FasterRCNNModule(pl.LightningModule):
     def __init__(
         self,
         num_classes=1,
         lr=0.0002,
-        # model_backbone="fasterrcnn",
     ):
         super().__init__()
         self.num_classes = num_classes
-        self.model = FasterRCNNThres(num_classes)
         self.lr = lr
+        backbone = fasterrcnn_resnet50_fpn(weights=FasterRCNN_ResNet50_FPN_Weights.DEFAULT)
+        backbone.out_channels = 2048
+        self.model = FasterRCNNThres(
+            backbone,
+            num_classes=num_classes
+        )
 
-    def forward(self, x):
-        return self.model(x)
+    def forward(self, images, targets):
+        return self.model(images, targets)
 
     def configure_optimizers(self):
         return torch.optim.AdamW(self.model.parameters(), lr=self.lr)
 
-    # def training_step(self, batch, batch_idx):
-    #     images, 
+    def training_step(self, batch, batch_idx):
+        images, targets = batch
+        outputs = self(images, targets)
+
+        loss = F.cross_entropy(targets['bboxes'], bboxes)
+        self.log('train_loss', loss)
+        return loss
+
+    @torch.no_grad()
+    def validation_step(self, batch, batch_idx):
+        images, targets = batch
+        outputs = self(images, targets)
+        loss = F.cross_entropy(targets['bboxes'], bboxes)
+        self.log('val_loss', loss)
+        return loss
+
+    @torch.no_grad()
+    def test_step(self, batch, batch_idx):
+        images, targets = batch
+        outputs = self(images, targets)
+        loss = F.cross_entropy(targets['bboxes'], bboxes)
+        self.log('test_loss', loss)
+        return loss 
+
+
+
