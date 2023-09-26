@@ -50,18 +50,18 @@ def create_model(num_classes=1, image_size=512, architecture="tf_efficientnetv2_
     return DetBenchTrain(net, config)
     # return DetBenchPredict(net, config)
 
-def images_to_tensor(images, transform=get_valid_transforms(512)):
-    image_sizes = [(image.size[1], image.size[0]) for image in images]
-    return torch.stack(
-        [
-            transform(
-                image=np.array(image, dtype=np.float32),
-                labels=np.ones(1),
-                bboxes=np.array([[0, 0, 1, 1]]),
-            )["image"]
-            for image in images
-        ]
-    ), image_sizes
+# def images_to_tensor(images, transform=get_valid_transforms(512)):
+#     image_sizes = [(image.size[1], image.size[0]) for image in images]
+#     return torch.stack(
+#         [
+#             transform(
+#                 image=np.array(image, dtype=np.float32),
+#                 labels=np.ones(1),
+#                 bboxes=np.array([[0, 0, 1, 1]]),
+#             )["image"]
+#             for image in images
+#         ]
+#     ), image_sizes
 
 # def run_wbf(predictions, image_size=512, iou_thr=0.44, skip_box_thr=0.2, weights=None):
 def run_wbf(predictions, image_size=512, iou_thr=0.44, skip_box_thr=0.43, weights=None):
