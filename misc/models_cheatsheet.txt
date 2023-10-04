@@ -1,0 +1,53 @@
+FasterRCNN
+    - transform -> GeneralizedRCNTransform
+    - backbone -> FasterRCNN
+    - rpn -> RegionProposalNetwork
+        - anchor_generator -> AnchorGenerator
+        - head -> RPNHead
+            - conv
+            - cls_logits
+            - bbox_pred
+    - roi_heads -> RoIHeads
+        - box_roi_pool -> MultiScaleRoIAlign
+        - box_head -> TwoMLPHead
+        - box_predictor -> FastRCNNPredictor
+
+SSD
+    - backbone -> SSDFeatureExtractorVGG
+    - anchor_generator -> DefaultBoxGenerator
+    - head -> SSDHead 
+        - classification_head -> SSDClassificationHead
+        - regression_head -> SSDRegressionHead
+    - transform -> GeneralizedRCNTransform
+
+ResNet50
+    - conv1
+    - bn1
+    - relu
+    - maxpool
+    - layers 1-4
+    - avgpool
+    - fc
+
+RetinaNet
+    - backbone -> BackboneWithFPN
+        - body -> IntermediateLayerGetter ~
+        - head -> FeaturePyramidNetwork
+    - anchor_generator -> AnchorGenerator
+    - head -> RetinaNetHead
+        - classification_head -> RetinaNetClassificationHead
+        - regression_head -> RetinaNetRegressionHead
+    - tranform -> GeneralizedRCNNTransform
+
+FCOS
+    - backbone -> BackboneWithFPN
+        - body -> IntermediateLayerGetter
+        - fpn -> FeaturePyramidNetwork
+    - anchor_generator -> AnchorGenerator
+    - head -> FCOSHead
+        - classification_head -> FCOSClassificationHead
+            - cls_logits
+        - regression_head -> FCOSRegressionHead
+            - bbox_reg
+            - bbox_crtness
+    - transform -> GeneralizedRCNNTransform
