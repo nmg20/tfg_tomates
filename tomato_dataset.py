@@ -93,7 +93,6 @@ class TomatoDataset(Dataset):
         }
         return image, target
 
-
 class TomatoDataModule(pl.LightningDataModule):
     """
     Datamodule: recibe la ruta a las imágenes, a cada dataframe y crea
@@ -202,7 +201,9 @@ class FasterRCNNThres(FasterRCNN):
     Modificación de FasterRCNN con una variable entrenable a modo de 
     umbral de resultados.
     """
-    def __init__(self, backbone, num_classes):
+    def __init__(self, num_classes):
+        backbone = fasterrcnn_resnet50_fpn(weights=FasterRCNN_ResNet50_FPN_Weights.DEFAULT)
+        backbone.out_channels = 2048
         super().__init__(backbone, num_classes, 
             rpn_anchor_generator = AnchorGenerator(
                 sizes=((32, 64, 128, 256, 512),), 
@@ -267,5 +268,9 @@ class FasterRCNNModule(pl.LightningModule):
         self.log('test_loss', loss)
         return loss 
 
-
+def main():
+    model = FasterRCNNModule()
+    dm = TomatoDataModule(imagesets_dir+"d801010/",images_dir, 4, 4)
+    trainer = pl.Trainer(max_epochs=10)
+    trainer.fit(model, dm)
 
