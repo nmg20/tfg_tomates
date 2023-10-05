@@ -15,15 +15,16 @@ from torchvision.ops import box_iou
 from sklearn.metrics import average_precision_score
 
 from fastcore.dispatch import typedispatch
-from pytorch_lightning import LightningModule
+# from pytorch_lightning import LightningModule
+from lightning.pytorch import LightningModule
 # from pytorch_lightning.core.decorators import auto_move_data
 
 from ensemble_boxes import ensemble_boxes_wbf
-
-from effdet.config.model_config import efficientdet_model_param_dict
-from effdet import get_efficientdet_config, EfficientDet, DetBenchTrain, DetBenchPredict
-from effdet.efficientdet import HeadNet
-from effdet.config.model_config import efficientdet_model_param_dict
+import effdet
+# from effdet.config.model_config import efficientdet_model_param_dict
+# from effdet import get_efficientdet_config, EfficientDet, DetBenchTrain
+# from effdet.efficientdet import HeadNet
+# from effdet.config.model_config import efficientdet_model_param_dict
 from config import *
 import timm
 from EffDetDataset import *
@@ -31,23 +32,23 @@ import matplotlib.pyplot as plt
 
 
 def create_model(num_classes=1, image_size=512, architecture="tf_efficientnetv2_l"):
-    efficientdet_model_param_dict[architecture] = dict(
+    effdet.config.model_config.efficientdet_model_param_dict[architecture] = dict(
         name=architecture,
         backbone_name=architecture,
         backbone_args=dict(drop_path_rate=0.2),
         num_classes=num_classes,
         url='', )
     
-    config = get_efficientdet_config(architecture)
+    config = effdet.get_efficientdet_config(architecture)
     config.update({'num_classes': num_classes})
     config.update({'image_size': (image_size, image_size)})
     
-    net = EfficientDet(config, pretrained_backbone=True)
-    net.class_net = HeadNet(
+    net = effdet.EfficientDet(config, pretrained_backbone=True)
+    net.class_net = effdet.efficientdet.HeadNet(
         config,
         num_outputs=config.num_classes,
     )
-    return DetBenchTrain(net, config)
+    return effdet.DetBenchTrain(net, config)
     # return DetBenchPredict(net, config)
 
 # def images_to_tensor(images, transform=get_valid_transforms(512)):
@@ -353,117 +354,117 @@ class EfficientDetModel(LightningModule):
 
 
 
-from fastcore.basics import patch
+# from fastcore.basics import patch
 
-@patch
-def aggregate_prediction_outputs(self: EfficientDetModel, outputs):
+# @patch
+# def aggregate_prediction_outputs(self: EfficientDetModel, outputs):
 
-    detections = torch.cat(
-        [output["batch_predictions"]["predictions"] for output in outputs]
-    )
+#     detections = torch.cat(
+#         [output["batch_predictions"]["predictions"] for output in outputs]
+#     )
 
-    image_ids = []
-    targets = []
-    for output in outputs:
-        batch_predictions = output["batch_predictions"]
-        image_ids.extend(batch_predictions["image_ids"])
-        targets.extend(batch_predictions["targets"])
+#     image_ids = []
+#     targets = []
+#     for output in outputs:
+#         batch_predictions = output["batch_predictions"]
+#         image_ids.extend(batch_predictions["image_ids"])
+#         targets.extend(batch_predictions["targets"])
 
-    (
-        predicted_bboxes,
-        predicted_class_confidences,
-        predicted_class_labels,
-    ) = self.post_process_detections(detections)
+#     (
+#         predicted_bboxes,
+#         predicted_class_confidences,
+#         predicted_class_labels,
+#     ) = self.post_process_detections(detections)
 
-    return (
-        predicted_class_labels,
-        image_ids,
-        predicted_bboxes,
-        predicted_class_confidences,
-        targets,
-    )
+#     return (
+#         predicted_class_labels,
+#         image_ids,
+#         predicted_bboxes,
+#         predicted_class_confidences,
+#         targets,
+#     )
 
-from objdetecteval.metrics.coco_metrics import get_coco_stats
+# from objdetecteval.metrics.coco_metrics import get_coco_stats
 
-@patch
-def validation_epoch_end(self: EfficientDetModel, outputs):
-    """Compute and log training loss and accuracy at the epoch level."""
-    print("Val\n")
-    validation_loss_mean = torch.stack(
-        [output["loss"] for output in outputs]
-    ).mean()
-    self.log("mean_val_loss", validation_loss_mean,on_step=False,on_epoch=True,prog_bar=False,
-        logger=True)
+# @patch
+# def validation_epoch_end(self: EfficientDetModel, outputs):
+#     """Compute and log training loss and accuracy at the epoch level."""
+#     print("Val\n")
+#     validation_loss_mean = torch.stack(
+#         [output["loss"] for output in outputs]
+#     ).mean()
+#     self.log("mean_val_loss", validation_loss_mean,on_step=False,on_epoch=True,prog_bar=False,
+#         logger=True)
 
-    (
-        predicted_class_labels,
-        image_ids,
-        predicted_bboxes,
-        predicted_class_confidences,
-        targets,
-    ) = self.aggregate_prediction_outputs(outputs)
+#     (
+#         predicted_class_labels,
+#         image_ids,
+#         predicted_bboxes,
+#         predicted_class_confidences,
+#         targets,
+#     ) = self.aggregate_prediction_outputs(outputs)
 
-    truth_image_ids = [target["image_id"].detach().item() for target in targets]
-    truth_boxes = [
-        target["bboxes"].detach()[:, [1, 0, 3, 2]].tolist() for target in targets
-    ] # convert to xyxy for evaluation
-    truth_labels = [target["labels"].detach().tolist() for target in targets]
+#     truth_image_ids = [target["image_id"].detach().item() for target in targets]
+#     truth_boxes = [
+#         target["bboxes"].detach()[:, [1, 0, 3, 2]].tolist() for target in targets
+#     ] # convert to xyxy for evaluation
+#     truth_labels = [target["labels"].detach().tolist() for target in targets]
 
-    stats = get_coco_stats(
-        prediction_image_ids=image_ids,
-        predicted_class_confidences=predicted_class_confidences,
-        predicted_bboxes=predicted_bboxes,
-        predicted_class_labels=predicted_class_labels,
-        target_image_ids=truth_image_ids,
-        target_bboxes=truth_boxes,
-        target_class_labels=truth_labels,
-    )['All']
-    # Logging de las estadísitcas de COCO
-    for k in stats.keys():
-        self.log(k,stats[k], on_step=False, on_epoch=True, prog_bar=False,
-                 logger=True)
+#     stats = get_coco_stats(
+#         prediction_image_ids=image_ids,
+#         predicted_class_confidences=predicted_class_confidences,
+#         predicted_bboxes=predicted_bboxes,
+#         predicted_class_labels=predicted_class_labels,
+#         target_image_ids=truth_image_ids,
+#         target_bboxes=truth_boxes,
+#         target_class_labels=truth_labels,
+#     )['All']
+#     # Logging de las estadísitcas de COCO
+#     for k in stats.keys():
+#         self.log(k,stats[k], on_step=False, on_epoch=True, prog_bar=False,
+#                  logger=True)
 
-    return {"val_loss": validation_loss_mean, "metrics": stats}
+#     return {"val_loss": validation_loss_mean, "metrics": stats}
 
-@patch
-def test_epoch_end(self: EfficientDetModel, outputs):
-    """Compute and log training loss and accuracy at the epoch level."""
+# @patch
+# def test_epoch_end(self: EfficientDetModel, outputs):
+#     """Compute and log training loss and accuracy at the epoch level."""
 
-    test_loss_mean = torch.stack(
-        [output["loss"] for output in outputs]
-    ).mean()
-    self.log("mean_test_loss",test_loss_mean,on_step=False,on_epoch=True,prog_bar=False,
-        logger=True)
+#     test_loss_mean = torch.stack(
+#         [output["loss"] for output in outputs]
+#     ).mean()
+#     self.log("mean_test_loss",test_loss_mean,on_step=False,on_epoch=True,prog_bar=False,
+#         logger=True)
 
-    (
-        predicted_class_labels,
-        image_ids,
-        predicted_bboxes,
-        predicted_class_confidences,
-        targets,
-    ) = self.aggregate_prediction_outputs(outputs)
+#     (
+#         predicted_class_labels,
+#         image_ids,
+#         predicted_bboxes,
+#         predicted_class_confidences,
+#         targets,
+#     ) = self.aggregate_prediction_outputs(outputs)
 
-    truth_image_ids = [target["image_id"].detach().item() for target in targets]
-    truth_boxes = [
-        target["bboxes"].detach()[:, [1, 0, 3, 2]].tolist() for target in targets
-    ] # convert to xyxy for evaluation
-    truth_labels = [target["labels"].detach().tolist() for target in targets]
+#     truth_image_ids = [target["image_id"].detach().item() for target in targets]
+#     truth_boxes = [
+#         target["bboxes"].detach()[:, [1, 0, 3, 2]].tolist() for target in targets
+#     ] # convert to xyxy for evaluation
+#     truth_labels = [target["labels"].detach().tolist() for target in targets]
 
-    stats = get_coco_stats(
-        prediction_image_ids=image_ids,
-        predicted_class_confidences=predicted_class_confidences,
-        predicted_bboxes=predicted_bboxes,
-        predicted_class_labels=predicted_class_labels,
-        target_image_ids=truth_image_ids,
-        target_bboxes=truth_boxes,
-        target_class_labels=truth_labels,
-    )['All']
-    # Logging de las estadísitcas de COCO
-    for k in stats.keys():
-        self.log(k,stats[k], on_step=False, on_epoch=True, prog_bar=False,
-                 logger=True)
+#     stats = get_coco_stats(
+#         prediction_image_ids=image_ids,
+#         predicted_class_confidences=predicted_class_confidences,
+#         predicted_bboxes=predicted_bboxes,
+#         predicted_class_labels=predicted_class_labels,
+#         target_image_ids=truth_image_ids,
+#         target_bboxes=truth_boxes,
+#         target_class_labels=truth_labels,
+#     )['All']
+#     # Logging de las estadísitcas de COCO
+#     for k in stats.keys():
+#         self.log(k,stats[k], on_step=False, on_epoch=True, prog_bar=False,
+#                  logger=True)
 
-    return {"test_loss": test_loss_mean, "metrics": stats}
+#     return {"test_loss": test_loss_mean, "metrics": stats}
 
 def get_model(layer=0):
     return freeze(EfficientDetModel(),layer)

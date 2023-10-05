@@ -209,7 +209,7 @@ class EfficientDetDataset(Dataset):
     def __len__(self):
         return len(self.ds)
 
-from pytorch_lightning import LightningDataModule
+from lightning.pytorch import LightningDataModule
 from torch.utils.data import DataLoader
 
 class EfficientDetDataModule(LightningDataModule):
