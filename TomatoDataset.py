@@ -6,7 +6,7 @@ import numpy as np
 from torch.utils.data import Dataset, DataLoader
 # import torchvision.transforms as T
 from torchvision.io import read_image
-from pytorch_lightning import LightningDataModule
+from lightning.pytorch import LightningDataModule
 from pathlib import Path
 
 import albumentations as A
@@ -36,6 +36,7 @@ class TomatoDatasetAdaptor:
         ].values
         class_labels = np.ones(len(bboxes))
         return image, bboxes, class_labels, idx
+        # return image, bboxes, class_labels
 
 def get_basic_transform():
     """
@@ -86,11 +87,12 @@ class TomatoDataset(Dataset):
         sample["bboxes"][:,[0, 1, 2, 3]] = [sample["bboxes"][
             :, [1, 0, 3, 2]]][0]
         target = {
-            "bboxes": torch.as_tensor(sample["bboxes"], dtype=torch.float32),
-            "labels": torch.as_tensor(labels),
+            "boxes": torch.as_tensor(sample["bboxes"], dtype=torch.float32),
+            "labels": torch.as_tensor(labels, dtype=torch.long),
             "image_id": torch.as_tensor([image_id])
         }
         return image, target, image_id
+        # return image, target
 
 class TomatoDataModule(LightningDataModule):
     """
@@ -102,8 +104,8 @@ class TomatoDataModule(LightningDataModule):
     # def __init__(self, train_dataframe, val_dataframe, image_dir, batch_size, num_workers):
     def __init__(self, dfs_path, images_path, batch_size, num_workers):
         self.train_df_path = f"{dfs_path}labelstrain.csv"
-        self.val_dataframe = f"{dfs_path}labelsval.csv"
-        self.test_dataframe = f"{dfs_path}labelstest.csv"
+        self.val_df_path = f"{dfs_path}labelsval.csv"
+        self.test_df_path = f"{dfs_path}labelstest.csv"
         self.images_path = images_path
         self.batch_size = batch_size
         self.num_workers = num_workers
@@ -121,7 +123,7 @@ class TomatoDataModule(LightningDataModule):
             train_dataset,
             batch_size = self.batch_size,
             shuffle = True,
-            pin_memory = True,
+            pin_memory = False,
             num_workers = self.num_workers,
             collate_fn = self.collate_fn,
         )
@@ -139,7 +141,7 @@ class TomatoDataModule(LightningDataModule):
             val_dataset,
             batch_size = self.batch_size,
             shuffle = False,
-            pin_memory = True,
+            pin_memory = False,
             num_workers = self.num_workers,
             collate_fn = self.collate_fn,
         )
@@ -157,7 +159,7 @@ class TomatoDataModule(LightningDataModule):
             test_dataset,
             batch_size = self.batch_size,
             shuffle = False,
-            pin_memory = True,
+            pin_memory = False,
             num_workers = self.num_workers,
             collate_fn = self.collate_fn,
         )
@@ -166,14 +168,16 @@ class TomatoDataModule(LightningDataModule):
     @staticmethod
     def collate_fn(batch):
         images, targets, image_ids = tuple(zip(*batch))
+        # images, targets = tuple(zip(*batch))
         images = torch.stack(images)
         images = images.float()
 
-        boxes = [target["bboxes"].float() for target in targets]
+        boxes = [target["boxes"].float() for target in targets]
         labels = [target["labels"].float() for target in targets]
        
         annotations = {
-            "bboxes": boxes,
+            "bbox": boxes,
             "cls": labels,
         }
-        return images, annotations, image_ids
+        return images, annotations, targets, image_ids
+        # return images, annotations
