@@ -1,24 +1,53 @@
-FasterRCNN
-    - transform -> GeneralizedRCNTransform
-    - backbone -> FasterRCNN
-    - rpn -> RegionProposalNetwork
-        - anchor_generator -> AnchorGenerator
-        - head -> RPNHead
-            - conv
-            - cls_logits
-            - bbox_pred
-    - roi_heads -> RoIHeads
-        - box_roi_pool -> MultiScaleRoIAlign
-        - box_head -> TwoMLPHead
-        - box_predictor -> FastRCNNPredictor
+FasterRCNN - fasterrcnn_resnet50_fpn (https://pytorch.org/vision/stable/models/generated/torchvision.models.detection.fasterrcnn_resnet50_fpn.html#torchvision.models.detection.fasterrcnn_resnet50_fpn)
+    Arquitectura:
+        - transform -> GeneralizedRCNTransform
+        - backbone -> FasterRCNN
+        - rpn -> RegionProposalNetwork
+            - anchor_generator -> AnchorGenerator
+            - head -> RPNHead
+                - conv
+                - cls_logits
+                - bbox_pred
+        - roi_heads -> RoIHeads
+            - box_roi_pool -> MultiScaleRoIAlign
+            - box_head -> TwoMLPHead
+            - box_predictor -> FastRCNNPredictor
+    Input:
+        - lista de tensores [C, H, W], uno por imagen entre 0 y 1.
+        -> train -> tensores de imágenes y targets (lista de diccionarios):
+            - boxes ([x1,y1,x2,y2])
+            - labels (clases)
+        -> inference -> tensores de imágenes
 
-SSD
-    - backbone -> SSDFeatureExtractorVGG
-    - anchor_generator -> DefaultBoxGenerator
-    - head -> SSDHead 
-        - classification_head -> SSDClassificationHead
-        - regression_head -> SSDRegressionHead
-    - transform -> GeneralizedRCNTransform
+    Output:
+        -> train -> losses de la RPN y R-CNN
+        -> inference -> List[Dict[Tensor]] -> dict:
+            - boxes ([x1, y1, x2, y2])
+            - labels 
+            - scores
+
+
+SSD - ssd300_vgg16 (https://pytorch.org/vision/stable/models/generated/torchvision.models.detection.ssd300_vgg16.html#torchvision.models.detection.ssd300_vgg16)
+    Arquitectura:
+        - backbone -> SSDFeatureExtractorVGG
+        - anchor_generator -> DefaultBoxGenerator
+        - head -> SSDHead 
+            - classification_head -> SSDClassificationHead
+            - regression_head -> SSDRegressionHead
+        - transform -> GeneralizedRCNTransform
+    Input:
+        - lista de tensores [C,H,W], uno por cada imagen, en el rango 0-1.
+            -> resize de las imágenes antes de ser pasadas al backbone
+        -> train -> tensores de imágenes y targets (lista de diccionarios):
+            - boxes ([x1,y1,x2,y2])
+            - labels (clases)
+        -> inference -> tensores de imágenes
+    Output:
+        -> train -> dict[Tensor] de loss de clasificación y regresión.
+        -> inference -> dict:
+            - boxes ([x1,y1,x2,y2])
+            - labels
+            - scores
 
 ResNet50
     - conv1
@@ -29,25 +58,53 @@ ResNet50
     - avgpool
     - fc
 
-RetinaNet
-    - backbone -> BackboneWithFPN
-        - body -> IntermediateLayerGetter ~
-        - head -> FeaturePyramidNetwork
-    - anchor_generator -> AnchorGenerator
-    - head -> RetinaNetHead
-        - classification_head -> RetinaNetClassificationHead
-        - regression_head -> RetinaNetRegressionHead
-    - tranform -> GeneralizedRCNNTransform
+RetinaNet - retinanet_resnet50_fpn (https://pytorch.org/vision/stable/models/generated/torchvision.models.detection.retinanet_resnet50_fpn.html#torchvision.models.detection.retinanet_resnet50_fpn)
+    Arquitectura:
+        - backbone -> BackboneWithFPN
+            - body -> IntermediateLayerGetter ~
+            - head -> FeaturePyramidNetwork
+        - anchor_generator -> AnchorGenerator
+        - head -> RetinaNetHead
+            - classification_head -> RetinaNetClassificationHead
+            - regression_head -> RetinaNetRegressionHead
+        - tranform -> GeneralizedRCNNTransform
+    Input:
+        - lista de tensores [C,H,W], uno por cada imagen, en el rango 0-1.
+            -> resize de las imágenes antes de ser pasadas al backbone
+        -> train -> tensores de imágenes y targets (lista de diccionarios):
+            - boxes ([x1,y1,x2,y2])
+            - labels (clases)
+        -> inference -> tensores de imágenes
+    Output:
+        -> train -> dict[Tensor] de loss de clasificación y regresión.
+        -> inference -> dict:
+            - boxes ([x1,y1,x2,y2])
+            - labels
+            - scores
 
-FCOS
-    - backbone -> BackboneWithFPN
-        - body -> IntermediateLayerGetter
-        - fpn -> FeaturePyramidNetwork
-    - anchor_generator -> AnchorGenerator
-    - head -> FCOSHead
-        - classification_head -> FCOSClassificationHead
-            - cls_logits
-        - regression_head -> FCOSRegressionHead
-            - bbox_reg
-            - bbox_crtness
-    - transform -> GeneralizedRCNNTransform
+FCOS - fcos_resnet50_fpn (https://pytorch.org/vision/stable/models/generated/torchvision.models.detection.fcos_resnet50_fpn.html#torchvision.models.detection.fcos_resnet50_fpn)
+    Arquitectura:
+        - backbone -> BackboneWithFPN
+            - body -> IntermediateLayerGetter
+            - fpn -> FeaturePyramidNetwork
+        - anchor_generator -> AnchorGenerator
+        - head -> FCOSHead
+            - classification_head -> FCOSClassificationHead
+                - cls_logits
+            - regression_head -> FCOSRegressionHead
+                - bbox_reg
+                - bbox_crtness
+        - transform -> GeneralizedRCNNTransform
+    Input:
+        - lista de tensores [C,H,W], uno por cada imagen, en el rango 0-1.
+            -> resize de las imágenes antes de ser pasadas al backbone
+        -> train -> tensores de imágenes y targets (lista de diccionarios):
+            - boxes ([x1,y1,x2,y2])
+            - labels (clases)
+        -> inference -> tensores de imágenes
+    Output:
+        -> train -> dict[Tensor] de loss de clasificación y regresión.
+        -> inference -> dict:
+            - boxes ([x1,y1,x2,y2])
+            - labels
+            - scores
