@@ -1,10 +1,10 @@
-from pytorch_lightning import Trainer 
+from lightning.pytorch import Trainer 
 from config import logs_dir
 from Model import EfficientDetModel
 from EffDetDataset import get_dm
 import os
 from pathlib import Path
-from pytorch_lightning.loggers import TensorBoardLogger
+from lightning.pytorch.loggers import TensorBoardLogger
 
 # def get_ckpt(name):
 #     """

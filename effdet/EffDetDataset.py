@@ -22,7 +22,7 @@ def get_dir_imgs_names(imgs_dir=data_dir):
 
 class TomatoDatasetAdaptor:
     def __init__(self, images_dir_path, annotations_dataframe):
-        self.images_dir_path = Path(images_dir_path)
+        self.images_dir_path = images_dir_path
         self.annotations_df = annotations_dataframe
         self.images = self.annotations_df.image.unique().tolist()
 
@@ -31,7 +31,7 @@ class TomatoDatasetAdaptor:
 
     def get_image_and_labels_by_idx(self, index):
         image_name = self.images[index]
-        image = Image.open(self.images_dir_path / image_name)
+        image = Image.open(self.images_dir_path + "/" + image_name)
         pascal_bboxes = self.annotations_df[self.annotations_df.image == image_name][
             ["xmin", "ymin", "xmax", "ymax"]
         ].values
@@ -218,22 +218,21 @@ class EfficientDetDataModule(LightningDataModule):
                 train_dataset_adaptor,
                 validation_dataset_adaptor,
                 test_dataset_adaptor,
-                pred_dataset_adaptor,
+                # pred_dataset_adaptor,
                 train_transforms=get_train_transforms(target_img_size=512),
                 valid_transforms=get_valid_transforms(target_img_size=512),
                 test_transforms=get_test_transforms(target_img_size=512),
-                pred_transforms=get_pred_transforms(target_img_size=512),
+                # pred_transforms=get_pred_transforms(target_img_size=512),
                 num_workers=NUM_WORKERS,
                 batch_size=BATCH_SIZE):
-        
         self.train_ds = train_dataset_adaptor
         self.valid_ds = validation_dataset_adaptor
         self.test_ds = test_dataset_adaptor
-        self.pred_ds = pred_dataset_adaptor
+        # self.pred_ds = pred_dataset_adaptor
         self.train_tfms = train_transforms
         self.valid_tfms = valid_transforms
         self.test_tfms = test_transforms
-        self.pred_tfms = pred_transforms
+        # self.pred_tfms = pred_transforms
         self.num_workers = num_workers
         self.batch_size = batch_size
         super().__init__()
@@ -293,23 +292,23 @@ class EfficientDetDataModule(LightningDataModule):
         )
         return test_loader
 
-    def pred_dataset(self) -> EfficientDetDataset:
-        return EfficientDetDataset(
-            dataset_adaptor=self.pred_ds, transforms=self.pred_tfms
-        )
+    # def pred_dataset(self) -> EfficientDetDataset:
+    #     return EfficientDetDataset(
+    #         dataset_adaptor=self.pred_ds, transforms=self.pred_tfms
+    #     )
 
-    def pred_dataloader(self) -> DataLoader:
-        pred_dataset = self.pred_dataset()
-        pred_loader = torch.utils.data.DataLoader(
-            pred_dataset,
-            batch_size=self.batch_size,
-            shuffle=False,
-            pin_memory=True,
-            drop_last=False,
-            num_workers=self.num_workers,
-            collate_fn=self.collate_fn,
-        )
-        return pred_loader
+    # def pred_dataloader(self) -> DataLoader:
+    #     pred_dataset = self.pred_dataset()
+    #     pred_loader = torch.utils.data.DataLoader(
+    #         pred_dataset,
+    #         batch_size=self.batch_size,
+    #         shuffle=False,
+    #         pin_memory=True,
+    #         drop_last=False,
+    #         num_workers=self.num_workers,
+    #         collate_fn=self.collate_fn,
+    #     )
+    #     return pred_loader
     
     @staticmethod
     def collate_fn(batch):
@@ -331,25 +330,24 @@ class EfficientDetDataModule(LightningDataModule):
 
         return images, annotations, targets, image_ids
 
-def load_dss(name,path=main_ds):
-    dataset_path = Path(path)
-    images_path = dataset_path/"JPEGImages"
-    dfs_path = dataset_path/"ImageSets"/name
-    # print(dfs_path)
-    df_tr = pd.read_csv(dfs_path/"labelstrain.csv")
-    df_ts = pd.read_csv(dfs_path/"labelstest.csv")
-    df_vl = pd.read_csv(dfs_path/"labelsval.csv")
+def load_dss(name,dataset_path=main_ds):
+    images_path = dataset_path+"/JPEGImages/"
+    dfs_path = dataset_path+"/ImageSets/"+name
+    # print(dfs_path+"/labelstrain.csv")
+    df_tr = pd.read_csv(dfs_path+"/labelstrain.csv")
+    df_ts = pd.read_csv(dfs_path+"/labelstest.csv")
+    df_vl = pd.read_csv(dfs_path+"/labelsval.csv")
 
     train_ds = TomatoDatasetAdaptor(images_path, df_tr)
     test_ds = TomatoDatasetAdaptor(images_path, df_ts)
     val_ds = TomatoDatasetAdaptor(images_path, df_vl)
     return train_ds, test_ds, val_ds
 
-def get_data(ds='d801010',file="test"):
-    if len(os.listdir(data_dir))==0:
-        return get_data_ds(read_imageset_names(ds,file))
-    else:
-        return get_data_ds(get_dir_imgs_names(data_dir))
+# def get_data(ds='d801010',file="test"):
+#     if len(os.listdir(data_dir))==0:
+#         return get_data_ds(read_imageset_names(ds,file))
+#     else:
+#         return get_data_ds(get_dir_imgs_names(data_dir))
 
 def get_dm(name="d801010", data_file="test", batch_size=BATCH_SIZE):
     """
@@ -357,37 +355,35 @@ def get_dm(name="d801010", data_file="test", batch_size=BATCH_SIZE):
     para crear el dataset para predecir.
     """
     train, test, val = load_dss(name,main_ds)
-    pred = get_data(name,data_file)
+    # pred = get_data(name,data_file)
     return EfficientDetDataModule(train_dataset_adaptor=train, 
         validation_dataset_adaptor=val,
         test_dataset_adaptor=test,
-        pred_dataset_adaptor=pred,
+        # pred_dataset_adaptor=pred,
         num_workers=NUM_WORKERS,
         batch_size=BATCH_SIZE)
 
-def get_main_df(path=main_ds):
-    dataset_path = Path(path)
-    return pd.read_csv(dataset_path/"ImageSets/all_annotations.csv")
+# def get_main_df(dataset_path=main_ds):
+#     return pd.read_csv(dataset_path+"/ImageSets/all_annotations.csv")
 
-def get_data_df(df, names):
-    """
-    Dado un dataframe maestro con todas las anotaciones y una lista de nombres,
-    (los de la carpeta /data), crea un dataframe con las anotaciones
-    correspondientes a las imágenes de la carpeta.
-    -> es necesario que las imágenes de la carpeta estén anotadas en el .csv maestro.
-    """
-    dfs=[]
-    for name in names:
-        dfs.append(df[df.image==name])
-    return pd.concat(dfs)
+# def get_data_df(df, names):
+#     """
+#     Dado un dataframe maestro con todas las anotaciones y una lista de nombres,
+#     (los de la carpeta /data), crea un dataframe con las anotaciones
+#     correspondientes a las imágenes de la carpeta.
+#     -> es necesario que las imágenes de la carpeta estén anotadas en el .csv maestro.
+#     """
+#     dfs=[]
+#     for name in names:
+#         dfs.append(df[df.image==name])
+#     return pd.concat(dfs)
 
-def get_data_ds(names, path=main_ds):
-    """
-    Dada la ruta de las imágenes y los nombres, crea el df a partir del .csv maestro
-    y genera el dataset.
-    """
-    # Lee del .csv completo por defecto
-    dataset_path = Path(path)
-    main_df = get_main_df()
-    df = get_data_df(main_df,names)
-    return TomatoDatasetAdaptor(dataset_path/"JPEGImages",df)
+# def get_data_ds(names, dataset_path=main_ds):
+#     """
+#     Dada la ruta de las imágenes y los nombres, crea el df a partir del .csv maestro
+#     y genera el dataset.
+#     """
+#     # Lee del .csv completo por defecto
+#     main_df = get_main_df()
+#     df = get_data_df(main_df,names)
+#     return TomatoDatasetAdaptor(dataset_path+"/JPEGImages",df)

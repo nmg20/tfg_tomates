@@ -3,11 +3,11 @@ from EffDetDataset import *
 from Model import *
 from Train import *
 import torch
-from pytorch_lightning import Trainer
-from pytorch_lightning.loggers import TensorBoardLogger
+from lightning.pytorch import Trainer
+from lightning.pytorch.loggers import TensorBoardLogger
 import argparse
 import os
-from utils.config import *
+from config import *
 
 def validate_file(f):
     if not os.path.exists(f):
