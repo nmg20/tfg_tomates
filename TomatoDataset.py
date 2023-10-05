@@ -12,7 +12,7 @@ from pathlib import Path
 import albumentations as A
 from albumentations.pytorch.transforms import ToTensorV2
 
-main_ds = "/media/rtx3090/Disco2TB/cvazquez/nico/datasets/T1280x720/"
+main_ds = "../datasets/T1280x720/"
 images_dir = main_ds+"JPEGImages/"
 imagesets_dir = main_ds+"ImageSets/"
 
@@ -35,7 +35,7 @@ class TomatoDatasetAdaptor:
             ["xmin","ymin","xmax","ymax"]
         ].values
         class_labels = np.ones(len(bboxes))
-        return image, bboxes, class_labels
+        return image, bboxes, class_labels, idx
 
 def get_basic_transform():
     """
@@ -46,10 +46,10 @@ def get_basic_transform():
         A.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
         ToTensorV2(p=1),
     ],
-    # p=1.0,
-    # bbox_params=A.BboxParams(
-    #     format="pascal_voc", min_area=0, min_visibility=0,
-    #     label_fields=["labels"])
+    p=1.0,
+    bbox_params=A.BboxParams(
+        format="pascal_voc", min_area=0, min_visibility=0,
+        label_fields=["labels"])
     )
     # return T.ToTensor()
 
@@ -69,7 +69,8 @@ class TomatoDataset(Dataset):
         (
             image, 
             bboxes, 
-            class_labels
+            class_labels,
+            image_id,
         ) = self.ds.img_and_labels_by_idx(idx)
         sample = {
             "image": np.array(image, dtype=np.float32),
@@ -87,8 +88,9 @@ class TomatoDataset(Dataset):
         target = {
             "bboxes": torch.as_tensor(sample["bboxes"], dtype=torch.float32),
             "labels": torch.as_tensor(labels),
+            "image_id": torch.as_tensor([image_id])
         }
-        return image, target
+        return image, target, image_id
 
 class TomatoDataModule(LightningDataModule):
     """
@@ -99,9 +101,9 @@ class TomatoDataModule(LightningDataModule):
     """
     # def __init__(self, train_dataframe, val_dataframe, image_dir, batch_size, num_workers):
     def __init__(self, dfs_path, images_path, batch_size, num_workers):
-        self.train_df_path = f"{dfs_path}/labelstrain.csv"
-        self.val_dataframe = f"{dfs_path}/labelsval.csv"
-        self.test_dataframe = f"{dfs_path}/labelstest.csv"
+        self.train_df_path = f"{dfs_path}labelstrain.csv"
+        self.val_dataframe = f"{dfs_path}labelsval.csv"
+        self.test_dataframe = f"{dfs_path}labelstest.csv"
         self.images_path = images_path
         self.batch_size = batch_size
         self.num_workers = num_workers
@@ -163,7 +165,7 @@ class TomatoDataModule(LightningDataModule):
 
     @staticmethod
     def collate_fn(batch):
-        images, targets = tuple(zip(*batch))
+        images, targets, image_ids = tuple(zip(*batch))
         images = torch.stack(images)
         images = images.float()
 
@@ -174,4 +176,4 @@ class TomatoDataModule(LightningDataModule):
             "bboxes": boxes,
             "cls": labels,
         }
-        return images, annotations
+        return images, annotations, image_ids
