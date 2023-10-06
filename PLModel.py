@@ -12,6 +12,8 @@ from torchvision.models.detection import fcos_resnet50_fpn, FCOS_ResNet50_FPN_We
 
 from lightning.pytorch import Trainer
 
+torch.set_float32_matmul_precision('medium') 
+
 class AbstractPLModel(nn.Module):
     """
     Clase que en base a un backbone crea el modelo con una capa de umbralización.
@@ -95,3 +97,13 @@ def freeze_modules(model, modules=["regression_head"]):
                 param.requires_grad = False
             if len(list(module.children()))>0:
                 freeze_modules(module, modules)
+
+def model_size(model):
+    param_size = 0
+    for param in model.parameters():
+        param_size += param.nelement() * param.element_size()
+    buffer_size = 0
+    for buffer in model.buffers():
+        buffer_size += buffer.nelement() * buffer.element_size()
+    size_all_mb = (param_size + buffer_size) / 1024**2
+    print('model size: {:.3f}MB'.format(size_all_mb))
