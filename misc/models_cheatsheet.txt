@@ -37,6 +37,7 @@ SSD - ssd300_vgg16 (https://pytorch.org/vision/stable/models/generated/torchvisi
         - transform -> GeneralizedRCNTransform
     Input:
         - lista de tensores [C,H,W], uno por cada imagen, en el rango 0-1.
+        -> imágenes de tamaño 300x300
             -> resize de las imágenes antes de ser pasadas al backbone
         -> train -> tensores de imágenes y targets (lista de diccionarios):
             - boxes ([x1,y1,x2,y2])

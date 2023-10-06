@@ -1,0 +1,30 @@
+!pip install -r requirements.txt
+
+# Si salta el mensaje de error '"python setup.py egg_info" failed with error code 1 in ...'
+!python -m pip install -U pip
+
+# Instalar requirements.txt otra vez
+
+# Si se queda demasiado tiempo en "Building wheels for collected packages: opencv-python-headless":
+! pip install --upgrade pip setuptools wheel
+o sino tambien:
+! pip install opencv-python==4.3.0.38
+
+# En general tarda mucho en crear la wheel, no te preocupes.
+
+# AttributeError: module 'cv2' has no attribute 'gapi_wip_gst_GStreamerPipeline' 
+!pip install opencv-python==4.5.5.64
+
+# Error de pytorch-lightning
+# ImportError: cannot import name 'get_num_classes' 
+# get_num_classes está deprecado
+
+# La solución está en reinstalar torchmetrics en la versión 0.6.0
+
+!pip install -U pytorch-lightning
+
+# Posible solución: Instalar pytorch-lightning desde github
+!pip install git+https://github.com/PyTorchLightning/pytorch-lightning
+
+#Para conectarse por ssh y exponer el puerto 16006 para visualizar TensorBoard
+$ssh -L 16006:127.0.0.1:16006 cvazquez@193.144.50.111
