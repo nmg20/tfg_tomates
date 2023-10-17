@@ -38,13 +38,21 @@ class TomatoDatasetAdaptor:
         return image, bboxes, class_labels, idx
         # return image, bboxes, class_labels
 
+mean = [0.485, 0.456, 0.406]
+std = [0.229, 0.224, 0.225]
+
+def denormalize(tensor):
+    z = tensor * torch.tensor(std).view(3,1,1)
+    z = z + torch.tensor(mean).view(3,1,1)
+    return z
+
 def get_basic_transform():
     """
     Transformaciones mínimas para aplicar a las imágenes y anotaciones.
     Base para añadir augmentations.
     """
     return A.Compose([
-        A.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+        A.Normalize(mean, std),
         ToTensorV2(p=1),
     ],
     p=1.0,
@@ -86,6 +94,7 @@ class TomatoDataset(Dataset):
 
         sample["bboxes"][:,[0, 1, 2, 3]] = [sample["bboxes"][
             :, [1, 0, 3, 2]]][0]
+
         target = {
             "boxes": torch.as_tensor(sample["bboxes"], dtype=torch.float32),
             "labels": torch.as_tensor(labels, dtype=torch.long),
@@ -179,5 +188,6 @@ class TomatoDataModule(LightningDataModule):
             "bbox": boxes,
             "cls": labels,
         }
-        return images, annotations, targets, image_ids
-        # return images, annotations
+        # return images, annotations, targets, image_ids
+        return images, targets, image_ids
+
