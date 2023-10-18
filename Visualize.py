@@ -34,6 +34,9 @@ def get_rectangle_edges(bbox):
     return bottom_left, width, height
 
 def draw_bboxes(ax, bboxes, labels=None, linewidth=1.5, color="orange"):
+    """
+    Dado un axis y un conjunto de bounding boxes (numpy.array), las dibuja
+    """
     for bbox in bboxes:
         bl, w, h = get_rectangle_edges(bbox)
         ax.add_patch(patches.Rectangle(
@@ -78,3 +81,27 @@ def compare_preds(image, bboxes, targets, labels=None, colors=["orange","red"]):
     draw_bboxes(ax,targets.detach().numpy(),labels,2,colors[1])
     draw_bboxes(ax,bboxes.detach().numpy(),labels,1,colors[0])
     plt.show()
+
+def bbox_size(bbox):
+    return (bbox[2]-bbox[0])*(bbox[3]-bbox[1])
+
+def max_size(bboxes):
+    sizes = [bbox_size(bbox) for bbox in bboxes]
+    return np.max(sizes)
+
+def equalize(bboxes, targets, ratio=5.0):
+    """
+    bboxes = tensor de bboxes
+    targets = ~
+    """
+    equalized = []
+    max_value = ratio*max_size(targets)
+    for bbox, target in zip(bboxes, targets):
+        if bbox_size(bbox)<=max_value:
+            equalized.append(bbox)
+    return torch.stack(equalized)
+
+def compare(images, bboxess, targetss):
+    bboxess = [equalize(bbs, tgs) for bbs, tgs in zip(bboxess, targetss)]
+    for image, bboxes, targets in zip(images, bboxess, targetss):
+        compare_preds(image, bboxes, targets)
