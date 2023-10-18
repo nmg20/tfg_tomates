@@ -14,6 +14,8 @@ from lightning.pytorch import Trainer
 if torch.cuda.is_available():
     torch.set_float32_matmul_precision('medium') 
 
+models_dir = "./pths/"
+
 def RetinaNetLoss(predictions, targets, reduction="sum"):
     """
     Dados dos listas con diccionarios a tensores de bboxes, scores y labels respectivamente
@@ -154,3 +156,12 @@ def model_size(model):
 # def inference(model, dl, output_dir):
 #     images_names = dl.dataset.ds.images
 #     model.eval()
+
+def load_model(path, model=None):
+    if model is None:
+        model = RetinaTomatoLightning()
+    model.load_state_dict(torch.load(path))
+    return model
+
+def save_model(model, name):
+    torch.save(model.state_dict(), f"{models_dir}/{name}.pt")
