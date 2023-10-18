@@ -10,6 +10,9 @@ from torchvision.models.detection import retinanet_resnet50_fpn, RetinaNet_ResNe
 from torchvision.ops import box_iou, sigmoid_focal_loss
 
 from lightning.pytorch import Trainer
+from lightning.pytorch.loggers import TensorBoardLogger
+
+from Visualize import 
 
 if torch.cuda.is_available():
     torch.set_float32_matmul_precision('medium') 
@@ -123,16 +126,16 @@ class RetinaTomatoLightning(LightningModule):
         self.log('test_loss', loss)
         return {'loss' : loss, 'batch_predictions' : batch_predictions}
     
-    # @torch.no_grad()
-    # def predict(self, batch, batch_idx):
-    #     #Asumimos que estas imágenes residen en un dataloader (test)
-    #     images, targets, ids = batch
-    #     outputs = self(images, targets)
-    #     loss = self.loss_fn(outputs, targets)
-    #     # return self.post_process_outputs(outputs)
-    #     return self.run_wbf([_post_process_output(output) for output in outputs])
+    @torch.no_grad()
+    def predict(self, batch, batch_idx):
+        #Asumimos que estas imágenes residen en un dataloader (test)
+        images, targets, ids = batch
+        outputs = self(images, targets)
+        loss = self.loss_fn(outputs, targets)
+        print("Loss: ",loss)
 
-    # def _post_process_output(self, output):
+
+
 
 
 def freeze_modules(model, modules=["regression_head"]):
@@ -165,3 +168,14 @@ def load_model(path, model=None):
 
 def save_model(model, name):
     torch.save(model.state_dict(), f"{models_dir}/{name}.pt")
+
+
+logger = TensorBoardLogger("./logs","retinanet")
+if torch.cuda.is_available():
+    trainer = Trainer(
+        accelerator="cuda", 
+        devices=1,
+        max_epochs=30, 
+        num_sanity_val_steps=1, 
+        logger=logger
+    )
