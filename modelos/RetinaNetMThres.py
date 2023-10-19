@@ -9,15 +9,49 @@ from torchvision.models.detection import retinanet_resnet50_fpn, RetinaNet_ResNe
 
 from torchvision.ops import box_iou, sigmoid_focal_loss
 
-from lightning.pytorch import Trainer
-from lightning.pytorch.loggers import TensorBoardLogger
-
 import Visualize
 
 if torch.cuda.is_available():
     torch.set_float32_matmul_precision('medium') 
 
 models_dir = "./pths/"
+
+class RetinaNetMThres(nn.Module):
+    """
+    Clase que completa la implementación anterior del modelo RetinaNet,
+    añadiendo un umbral manual para todas las predicciones.
+    """
+    def __init__(self, num_classes=1, threshold=0.5):
+        super(RetinaNetMThres, self).__init__()
+        self.model = retinanet_resnet50_fpn(
+            weights = RetinaNet_ResNet50_FPN_Weights.DEFAULT,
+            weights_backbone = ResNet50_Weights.DEFAULT
+        )
+        self.threshold = threshold
+
+    def forward(self, images, targets=None):
+        outputs = self.model(images, target)
+        if not model.training or targets is None:
+            outputs = self.threshold_dets(outputs)
+        return outputs
+
+    def threshold_dets(self, detections):
+        """
+        Filtra los resultados del modelo umbralizándolos en base
+        a la variable 'threshold' del mismo. 
+        """
+        thresholded_detections = []
+        for detection in detections:
+            boxes, scores, labels = detection['boxes'], detection['scores'], detection['labels']
+            indexes = np.where(scores > self.threshold)
+            thresholded_detections.append(
+                {
+                    'boxes': boxes[indexes],
+                    'scores': scores[indexes],
+                    'labels': labels[indexes],
+                }
+            )
+        return thresholded_detections
 
 def RetinaNetLoss(predictions, targets, reduction="sum"):
     """
@@ -35,7 +69,7 @@ def RetinaNetLoss(predictions, targets, reduction="sum"):
         loss += sigmoid_focal_loss(p_box[best_preds], t_box, reduction=reduction)
     return loss
 
-class RetinaTomatoLightning(LightningModule):
+class RetinaMThresTomatoLightning(LightningModule):
     """
     Clase que contiene el funcionamiento básico de un modelo a efectos de entrenamiento/validación/test.
     Crea un modelo en concreto en base al backbone específicado.
@@ -49,11 +83,7 @@ class RetinaTomatoLightning(LightningModule):
         super().__init__()
         self.num_classes = num_classes
         self.lr = lr
-        self.model = retinanet_resnet50_fpn(
-            weights = RetinaNet_ResNet50_FPN_Weights.DEFAULT,
-            weights_backbone = ResNet50_Weights.DEFAULT
-        )
-        # self.loss_fn = sigmoid_loss
+        self.model = RetinaNetMThres()
         self.loss_fn = RetinaNetLoss
 
     def forward(self, images, targets=None):
@@ -106,51 +136,3 @@ class RetinaTomatoLightning(LightningModule):
             [o['boxes'] for o in outputs],
             [t['boxes'] for t in targets])
 
-
-
-
-def freeze_modules(model, modules=["regression_head"]):
-    """
-    Congela módulos con nombre del modelo.
-    """
-    for name, module in model.named_modules():
-        if any(module_name in name for module_name in modules):
-            for param in module.parameters():
-                param.requires_grad = False
-            if len(list(module.children()))>0:
-                freeze_modules(module, modules)
-
-def model_size(model):
-    """
-    Devuelve el tamaño del modelo completo en base al tamaño de 
-    sus parámetros.
-    """
-    param_size = 0
-    for param in model.parameters():
-        param_size += param.nelement() * param.element_size()
-    buffer_size = 0
-    for buffer in model.buffers():
-        buffer_size += buffer.nelement() * buffer.element_size()
-    size_all_mb = (param_size + buffer_size) / 1024**2
-    print('model size: {:.3f}MB'.format(size_all_mb))
-
-
-def load_model(path, model=None):
-    if model is None:
-        model = RetinaTomatoLightning()
-    model.load_state_dict(torch.load(path))
-    return model
-
-def save_model(model, name):
-    torch.save(model.state_dict(), f"{models_dir}/{name}.pt")
-
-
-logger = TensorBoardLogger("./logs","retinanet")
-if torch.cuda.is_available():
-    trainer = Trainer(
-        accelerator="cuda", 
-        devices=1,
-        max_epochs=30, 
-        num_sanity_val_steps=1, 
-        logger=logger
-    )
