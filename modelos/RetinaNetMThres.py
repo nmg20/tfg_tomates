@@ -7,7 +7,7 @@ import numpy as np
 from torchvision.models import resnet50, ResNet50_Weights
 from torchvision.models.detection import retinanet_resnet50_fpn, RetinaNet_ResNet50_FPN_Weights
 
-from torchvision.ops import box_iou, sigmoid_focal_loss
+from torchvision.ops import box_iou, sigmoid_focal_loss, boxes as box_ops
 
 import Visualize
 
@@ -15,45 +15,8 @@ if torch.cuda.is_available():
     torch.set_float32_matmul_precision('medium') 
 
 models_dir = "./pths/"
-
-class RetinaNetMThres(nn.Module):
-    """
-    Clase que completa la implementación anterior del modelo RetinaNet,
-    añadiendo un umbral manual para todas las predicciones.
-    """
-    def __init__(self, num_classes=1, threshold=0.5):
-        super(RetinaNetMThres, self).__init__()
-        self.model = retinanet_resnet50_fpn(
-            weights = RetinaNet_ResNet50_FPN_Weights.DEFAULT,
-            weights_backbone = ResNet50_Weights.DEFAULT
-        )
-        self.threshold = threshold
-
-    def forward(self, images, targets=None):
-        outputs = self.model(images, target)
-        if not model.training or targets is None:
-            outputs = self.threshold_dets(outputs)
-        return outputs
-
-    def threshold_dets(self, detections):
-        """
-        Filtra los resultados del modelo umbralizándolos en base
-        a la variable 'threshold' del mismo. 
-        """
-        thresholded_detections = []
-        for detection in detections:
-            boxes, scores, labels = detection['boxes'], detection['scores'], detection['labels']
-            indexes = np.where(scores > self.threshold)
-            thresholded_detections.append(
-                {
-                    'boxes': boxes[indexes],
-                    'scores': scores[indexes],
-                    'labels': labels[indexes],
-                }
-            )
-        return thresholded_detections
-
-def RetinaNetLoss(predictions, targets, reduction="sum"):
+    
+def retinanet_loss(predictions, targets, reduction="sum"):
     """
     Dados dos listas con diccionarios a tensores de bboxes, scores y labels respectivamente
     obtiene los mejores iou de las predicciones y las anotaciones (targets)
@@ -64,9 +27,10 @@ def RetinaNetLoss(predictions, targets, reduction="sum"):
         p_box, p_scores, p_labels = prediction['boxes'], prediction['scores'], prediction['labels']
         t_box, t_labels = target['boxes'], target['labels']
         # Tomamos las coincidencias de las predicciones en base a los targets
-        iou = box_iou(t_box, p_box)
-        best_iou, best_preds = iou.max(dim=1)
-        loss += sigmoid_focal_loss(p_box[best_preds], t_box, reduction=reduction)
+        iou = box_iou(p_box, t_box)
+        best_iou, best_targets = iou.max(dim=1)
+        loss += sigmoid_focal_loss(p_box, t_box[best_targets], reduction=reduction)
+        # loss += nn.SmoothL1Loss(p_box[best_preds], t_box)
     return loss
 
 class RetinaMThresTomatoLightning(LightningModule):
@@ -79,15 +43,44 @@ class RetinaMThresTomatoLightning(LightningModule):
         self,
         num_classes=1,
         lr=0.0002,
+        threshold=0.23,
+        # nms_threshold=0.5,
     ):
         super().__init__()
         self.num_classes = num_classes
         self.lr = lr
-        self.model = RetinaNetMThres()
-        self.loss_fn = RetinaNetLoss
+        self.model = retinanet_resnet50_fpn(
+            weights = RetinaNet_ResNet50_FPN_Weights.DEFAULT,
+            weights_backbone = ResNet50_Weights.DEFAULT
+        )
+        self.threshold = threshold
+        # self.nms_thres = nms_threshold
+        self.loss_fn = retinanet_loss
 
     def forward(self, images, targets=None):
-        return self.model(images, targets)
+        outputs = self.model(images, targets)
+        if not self.model.training or targets is None:
+            outputs = self.threshold_dets(outputs)
+        return outputs
+
+    def threshold_dets(self, detections):
+        """
+        Filtra los resultados del modelo umbralizándolos en base
+        a la variable 'threshold' del mismo. 
+        """
+        thresholded_detections = []
+        for detection in detections:
+            boxes, scores, labels = detection['boxes'], detection['scores'], detection['labels']
+            indexes = np.where(scores.detach().cpu().numpy() > self.threshold)
+            # indexes = boxes.batched_nms(boxes, scores, labels, self.nms_thres)
+            thresholded_detections.append(
+                {
+                    'boxes': boxes[indexes],
+                    'scores': scores[indexes],
+                    'labels': labels[indexes],
+                }
+            )
+        return thresholded_detections
 
     def configure_optimizers(self):
         return torch.optim.AdamW(self.model.parameters(), lr=self.lr)

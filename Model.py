@@ -1,5 +1,5 @@
 import torch
-from modelos.RetinaNetSimple import RetinaTomatoLightning
+# from modelos.RetinaNetSimple import RetinaTomatoLightning
 from modelos.RetinaNetMThres import RetinaMThresTomatoLightning
 
 from lightning.pytorch import Trainer
@@ -32,7 +32,8 @@ def model_size(model):
 
 def load_model(path, model=None):
     if model is None:
-        model = RetinaTomatoLightning()
+        # model = RetinaTomatoLightning()
+        model = RetinaMThresTomatoLightning()
     model.load_state_dict(torch.load(path))
     return model
 
@@ -44,7 +45,7 @@ if torch.cuda.is_available():
     trainer = Trainer(
         accelerator="cuda", 
         devices=1,
-        max_epochs=30, 
+        max_epochs=40, 
         num_sanity_val_steps=1, 
         logger=logger
     )
