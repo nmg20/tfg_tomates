@@ -38,17 +38,8 @@ class TomatoDatasetAdaptor:
         return image, bboxes, class_labels, idx
         # return image, bboxes, class_labels
 
-    # def 
-
-#plt.imshow(image_tensor.permute(1,2,0))
-
 mean = [0.485, 0.456, 0.406]
 std = [0.229, 0.224, 0.225]
-
-def denormalize(tensor):
-    z = tensor * torch.tensor(std).view(3,1,1)
-    z = z + torch.tensor(mean).view(3,1,1)
-    return z
 
 def get_basic_transform():
     """
@@ -60,9 +51,9 @@ def get_basic_transform():
         ToTensorV2(p=1),
     ],
     p=1.0,
-    # bbox_params=A.BboxParams(
-    #     format="pascal_voc", min_area=0, min_visibility=0,
-    #     label_fields=["labels"])
+    bbox_params=A.BboxParams(
+        format="pascal_voc", min_area=0, min_visibility=0,
+        label_fields=["labels"])
     )
     # return T.ToTensor()
 
