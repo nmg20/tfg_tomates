@@ -12,7 +12,7 @@ from torchvision.ops import box_iou, sigmoid_focal_loss
 from lightning.pytorch import Trainer
 from lightning.pytorch.loggers import TensorBoardLogger
 
-from Visualize import 
+from Visualize import *
 
 if torch.cuda.is_available():
     torch.set_float32_matmul_precision('medium') 
@@ -131,9 +131,12 @@ class RetinaTomatoLightning(LightningModule):
         #Asumimos que estas imágenes residen en un dataloader (test)
         images, targets, ids = batch
         outputs = self(images, targets)
-        loss = self.loss_fn(outputs, targets)
-        print("Loss: ",loss)
-
+        # loss = self.loss_fn(outputs, targets)
+        # print("Loss: ",loss)
+        Visualize.compare(
+            images,
+            [o['boxes'] for o in outputs],
+            [t['boxes'] for t in targets])
 
 
 
