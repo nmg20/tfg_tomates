@@ -14,6 +14,12 @@ from lightning.pytorch.loggers import TensorBoardLogger
 
 import Visualize
 
+#Instalación de las métricas de detección
+# !pip install git+https://github.com/alexhock/object-detection-metrics
+
+from objdetecteval.metrics.coco_metrics import get_coco_stats
+from fastcore.basics import patch
+
 if torch.cuda.is_available():
     torch.set_float32_matmul_precision('medium') 
 
@@ -96,7 +102,6 @@ class RetinaTomatoLightning(LightningModule):
         images, targets, ids = batch
         loss = self(images, targets)
         # Registramos el error de clasificación y regresión de bbox
-        # self.log('classification', loss['classification'].detach())
         self.log('train_loss', loss['bbox_regression'].detach())
         return {'loss' : loss['bbox_regression']}
 
@@ -105,7 +110,8 @@ class RetinaTomatoLightning(LightningModule):
         images, targets, ids = batch
         outputs = self(images, targets)
         batch_predictions = {
-            'predictions' : [output['boxes'] for output in outputs],
+            # 'predictions' : [output['boxes'] for output in outputs],
+            'predictions' : outputs,
             'targets' : targets,
             'image_ids' : ids,
         }
@@ -118,7 +124,8 @@ class RetinaTomatoLightning(LightningModule):
         images, targets, ids = batch
         outputs = self(images, targets)
         batch_predictions = {
-            'predictions' : [output['boxes'] for output in outputs],
+            # 'predictions' : [output['boxes'] for output in outputs],
+            'predictions' : outputs,
             'targets' : targets,
             'image_ids' : ids,
         }
@@ -137,48 +144,3 @@ class RetinaTomatoLightning(LightningModule):
             images,
             [o['boxes'] for o in outputs],
             [t['boxes'] for t in targets])
-
-
-
-
-def freeze_modules(model, modules=["regression_head"]):
-    for name, module in model.named_modules():
-        if any(module_name in name for module_name in modules):
-            for param in module.parameters():
-                param.requires_grad = False
-            if len(list(module.children()))>0:
-                freeze_modules(module, modules)
-
-def model_size(model):
-    param_size = 0
-    for param in model.parameters():
-        param_size += param.nelement() * param.element_size()
-    buffer_size = 0
-    for buffer in model.buffers():
-        buffer_size += buffer.nelement() * buffer.element_size()
-    size_all_mb = (param_size + buffer_size) / 1024**2
-    print('model size: {:.3f}MB'.format(size_all_mb))
-
-# def inference(model, dl, output_dir):
-#     images_names = dl.dataset.ds.images
-#     model.eval()
-
-def load_model(path, model=None):
-    if model is None:
-        model = RetinaTomatoLightning()
-    model.load_state_dict(torch.load(path))
-    return model
-
-def save_model(model, name):
-    torch.save(model.state_dict(), f"{models_dir}/{name}.pt")
-
-
-logger = TensorBoardLogger("./logs","retinanet")
-if torch.cuda.is_available():
-    trainer = Trainer(
-        accelerator="cuda", 
-        devices=1,
-        max_epochs=30, 
-        num_sanity_val_steps=1, 
-        logger=logger
-    )
