@@ -86,6 +86,7 @@ class TomatoDataset(Dataset):
         image = sample["image"]
         pascal_bboxes = sample["bboxes"]
         labels = sample["labels"]
+        # w, h = image.shape[1:]
 
         # sample["bboxes"][:,[0, 1, 2, 3]] = [sample["bboxes"][
         #     :, [1, 0, 3, 2]]][0]
@@ -93,7 +94,8 @@ class TomatoDataset(Dataset):
         target = {
             "boxes": torch.as_tensor(sample["bboxes"], dtype=torch.float32),
             "labels": torch.as_tensor(labels, dtype=torch.long),
-            "image_id": torch.as_tensor([image_id])
+            "image_id": torch.as_tensor([image_id]),
+            # "image_size": (w,h)
         }
         return image, target, image_id
         # return image, target
@@ -178,10 +180,12 @@ class TomatoDataModule(LightningDataModule):
 
         boxes = [target["boxes"].float() for target in targets]
         labels = [target["labels"].float() for target in targets]
-       
+        # image_sizes = torch.tensor([target["image_size"] for target in targets]).float()
+        
         annotations = {
             "bbox": boxes,
             "cls": labels,
+            # "image_size": image_sizes,
         }
         # return images, annotations, targets, image_ids
         return images, targets, image_ids
