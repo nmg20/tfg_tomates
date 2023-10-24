@@ -1,5 +1,5 @@
 import torch
-# from modelos.RetinaNetSimple import RetinaTomatoLightning
+from modelos.RetinaNetSimple import RetinaTomatoLightning
 from modelos.RetinaNetMThres import RetinaMThresTomatoLightning
 
 from lightning.pytorch import Trainer
@@ -30,10 +30,12 @@ def model_size(model):
     size_all_mb = (param_size + buffer_size) / 1024**2
     print('model size: {:.3f}MB'.format(size_all_mb))
 
-def load_model(path, model=None):
+def load_model(path, model=None, flag=1):
     if model is None:
-        # model = RetinaTomatoLightning()
-        model = RetinaMThresTomatoLightning()
+        if flag==0:
+            model = RetinaTomatoLightning()
+        else:
+            model = RetinaMThresTomatoLightning()
     model.load_state_dict(torch.load(path))
     return model
 
