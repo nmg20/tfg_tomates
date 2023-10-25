@@ -13,6 +13,9 @@ from torchvision.utils import save_image#, draw_bounding_boxes
 mean = [0.485, 0.456, 0.406]
 std = [0.229, 0.224, 0.225]
 
+good_label="blue"
+bad_label="red"
+
 def denormalize(tensor):
     z = tensor * torch.tensor(std).view(3,1,1)
     z = z + torch.tensor(mean).view(3,1,1)
@@ -47,6 +50,27 @@ def draw_bboxes(ax, bboxes, labels=None, linewidth=1.5, color="orange"):
             )
         )
 
+def label_color(label):
+    if label==1:
+        return "red"
+    else:
+        return "blue"
+
+def draw_bboxes_labels(ax, bboxes, labels, linewidth=1.5):
+    """
+    Dado un axis y un conjunto de bounding boxes (numpy.array), las dibuja
+    """
+    for bbox, label in zip(bboxes, labels):
+        bl, w, h = get_rectangle_edges(bbox)
+        color = label_color(label)
+        ax.add_patch(patches.Rectangle(
+            bl, w, h,
+            linewidth=linewidth,
+            edgecolor=color, 
+            fill=False,
+            )
+        )
+
 def show_image_tensor(tensor):
     """
     Desaplica la normalización hecha para convertir la imagen en 
@@ -69,17 +93,18 @@ def show_bboxes(image : torch.Tensor, bboxes : torch.Tensor,
     draw_bboxes(ax,bboxes.detach().numpy(),labels,linewidth,color)
     plt.show()
 
-def compare_preds(image, bboxes, targets, labels=None, colors=["orange","red"]):
+def compare_preds(image, bboxes, targets, labels, loss, colors=["orange","red"]):
     """
     Dibuja una imagen en un eje y plasma sobre la misma dos conjuntos
     de bounding boxes (tensores).
     """
     # fig, ax = plt.subplots(1, figsize=(15,15))
     fig, ax = plt.subplots(1)
+    fig.suptitle(f"Loss: {loss}.", fontsize=16)
     image = denormalize(image)
     ax.imshow(image.permute(1,2,0))
-    draw_bboxes(ax,targets.detach().numpy(),labels,2,colors[1])
-    draw_bboxes(ax,bboxes.detach().numpy(),labels,1,colors[0])
+    draw_bboxes(ax,targets.detach().numpy(),labels,linewidth=2,color=colors[0])
+    draw_bboxes_labels(ax,bboxes.detach().numpy(),labels,linewidth=1)
     plt.show()
 
 def bbox_size(bbox):
@@ -101,7 +126,17 @@ def equalize(bboxes, targets, ratio=5.0):
             equalized.append(bbox)
     return torch.stack(equalized)
 
-def compare(images, bboxess, targetss):
-    bboxess = [equalize(bbs, tgs) for bbs, tgs in zip(bboxess, targetss)]
-    for image, bboxes, targets in zip(images, bboxess, targetss):
-        compare_preds(image, bboxes, targets)
+def compare(images, bboxess, targetss, labelss, losses):
+    # bboxess = [equalize(bbs, tgs) for bbs, tgs in zip(bboxess, targetss)]
+    for image, bboxes, targets, labels, loss in zip(images, bboxess, targetss, labelss, losses):
+        compare_preds(image, bboxes, targets, labels, loss)
+
+def inference(images, outputs, targets, loss):
+    compare(
+        images,
+        [o['boxes'] for o in outputs],
+        [t['boxes'] for t in targets],
+        [o['labels'] for o in outputs],
+        loss[0]
+        # loss
+    )
