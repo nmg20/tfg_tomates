@@ -1,6 +1,8 @@
 import torch
-from modelos.RetinaNetSimple import RetinaTomatoLightning
-from modelos.RetinaNetMThres import RetinaMThresTomatoLightning
+# from modelos.RetinaNetSimple import RetinaTomatoLightning
+# from modelos.RetinaNetMThres import RetinaMThresTomatoLightning
+from modelos.RetinaNet import RetinaNetTomatoLightning
+from modelos.FasterRCNN import FasterRCNNTomatoLightning
 
 from lightning.pytorch import Trainer
 from lightning.pytorch.loggers import TensorBoardLogger
@@ -43,11 +45,11 @@ def save_model(model, name):
     torch.save(model.state_dict(), f"{models_dir}/{name}.pt")
 
 logger = TensorBoardLogger("./logs","retinanet")
-if torch.cuda.is_available():
-    trainer = Trainer(
-        accelerator="cuda", 
-        devices=1,
-        max_epochs=40, 
-        num_sanity_val_steps=1, 
-        logger=logger
-    )
+# if torch.cuda.is_available():
+#     trainer = Trainer(
+#         accelerator="cuda", 
+#         devices=1,
+#         max_epochs=40, 
+#         num_sanity_val_steps=1, 
+#         logger=logger
+#     )

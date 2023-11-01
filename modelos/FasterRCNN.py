@@ -23,7 +23,7 @@ def compute_loss(predictions, targets):
     total = 0.
     for prediction, target in zip(predictions, targets):
         p_box, p_scores, p_labels = prediction['boxes'], prediction['scores'], prediction['labels']
-        t_box, t_labels = target['boxes'], target['labels']
+        t_box, t_labels = target['boxes'].to(torch.device('cuda')), target['labels'].to(torch.device('cuda'))
         iou = box_iou(t_box, p_box)
         best_iou, indexes = iou.max(dim=1)
         class_loss = sigmoid_focal_loss(p_box[indexes],t_box,reduction="sum")
@@ -32,12 +32,22 @@ def compute_loss(predictions, targets):
         losses.append((class_loss, box_loss))
     return losses, total
 
-def resize_boxes(boxes, sizes, flag=1):
-    #Flag=1 -> downscale
+def resize_boxes(boxes, sizes):
     new_boxes = []
     for box in boxes:
-        if flag==1:
-            sizes = [(1/x,1/y) for x,y in sizes]
+        new_boxes.append(
+            [
+                box[0]/sizes[1],
+                box[1]/sizes[0],
+                box[2]/sizes[1],
+                box[3]/sizes[0]
+            ]
+        )
+    return new_boxes
+
+def upsize_boxes(boxes, sizes):
+    new_boxes = []
+    for box in boxes:
         new_boxes.append(
             [
                 box[0]*sizes[1],
@@ -91,17 +101,21 @@ class FasterRCNNTomatoLightning(LightningModule):
         detections = []
         for output, size in zip(outputs, sizes):
             #Paso a arrays
-            boxes = [output['boxes'].detach().cpu().numpy().tolist()]
-            scores = [output['scores'].detach().cpu().numpy().tolist()]
-            labels = [output['labels'].detach().cpu().numpy().tolist()]
+            boxes = output['boxes'].detach().cpu().numpy()
+            scores = output['scores'].detach().cpu().numpy()
+            labels = output['labels'].detach().cpu().numpy()
+            #Aplicar fusion ponderada
+            indexes = np.where(labels == 1)
             #Aplicar fusion ponderada
             boxes, scores, labels = ensemble_boxes_wbf.weighted_boxes_fusion(
-                [(resize_boxes(boxes, size))], scores, labels,
-                iou_thr=self.iou_thr, skip_box_thr=self.threshold,)
+                [(resize_boxes(boxes, size))],
+                [scores.tolist()],
+                [labels.tolist()],
+                iou_thr=self.iou_thr, skip_box_thr=self.threshold)
             detections.append({
-                'boxes': torch.tensor(resize_boxes(boxes, size, 0)),
-                'scores': torch.tensor(np.array(scores)),
-                'labels': torch.tensor(np.array([int(x) for x in labels]))
+                'boxes': torch.tensor(upsize_boxes(boxes, size)).to(torch.device('cuda')),
+                'scores': torch.tensor(np.array(scores)).to(torch.device('cuda')),
+                'labels': torch.tensor(np.array([int(x) for x in labels])).to(torch.device('cuda'))
             })
         return detections
 
@@ -112,8 +126,10 @@ class FasterRCNNTomatoLightning(LightningModule):
         images, targets, ids = batch
         loss = self(images, targets)
         # Registramos el error de clasificación y regresión de bbox
-        self.log('train_box_loss', loss['bbox_regression'].detach())
-        self.log('train_box_loss', loss['bbox_regression'].detach())
+        self.log('train_class_loss', loss['loss_classifier'].detach())
+        self.log('train_box_loss', loss['loss_box_reg'].detach())
+        self.log('train_objectness', loss['loss_objectness'].detach())
+        self.log('train_rpn_box_loss', loss['loss_rpn_box_reg'].detach())
         return {'loss' : loss['bbox_regression']}
 
     @torch.no_grad()
