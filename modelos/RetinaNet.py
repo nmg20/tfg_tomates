@@ -32,12 +32,22 @@ def compute_loss(predictions, targets):
         losses.append((class_loss, box_loss))
     return losses, total
 
-def resize_boxes(boxes, sizes, flag=1):
-    #Flag=1 -> downscale
+def resize_boxes(boxes, sizes):
     new_boxes = []
     for box in boxes:
-        if flag==1:
-            sizes = [(1/x,1/y) for x,y in sizes]
+        new_boxes.append(
+            [
+                box[0]/sizes[1],
+                box[1]/sizes[0],
+                box[2]/sizes[1],
+                box[3]/sizes[0]
+            ]
+        )
+    return new_boxes
+
+def upsize_boxes(boxes, sizes):
+    new_boxes = []
+    for box in boxes:
         new_boxes.append(
             [
                 box[0]*sizes[1],
@@ -78,7 +88,7 @@ class RetinaNetTomatoLightning(LightningModule):
         self.iou_thr = iou_thr
         self.loss_fn = compute_loss
         self.model.num_classes = num_classes
-    
+        
     def forward(self, images, targets=None):
         outputs = self.model(images, targets)
         if not self.model.training or targets is None:
@@ -91,17 +101,19 @@ class RetinaNetTomatoLightning(LightningModule):
         detections = []
         for output, size in zip(outputs, sizes):
             #Paso a arrays
-            boxes = [output['boxes'].detach().cpu().numpy().tolist()]
-            scores = [output['scores'].detach().cpu().numpy().tolist()]
-            labels = [output['labels'].detach().cpu().numpy().tolist()]
-            #Aplicar fusion ponderada
+            boxes = output['boxes'].detach().cpu().numpy()
+            scores = output['scores'].detach().cpu().numpy()
+            labels = output['labels'].detach().cpu().numpy()
+            # indexes = np.where(labels == 1)
             boxes, scores, labels = ensemble_boxes_wbf.weighted_boxes_fusion(
-                [(resize_boxes(boxes, size))], scores, labels,
-                iou_thr=self.iou_thr, skip_box_thr=self.threshold,)
+                [(resize_boxes(boxes, size))],
+                [scores.tolist()],
+                [labels.tolist()],
+                iou_thr=self.iou_thr, skip_box_thr=self.threshold)
             detections.append({
-                'boxes': torch.tensor(resize_boxes(boxes, size, 0)),
-                'scores': torch.tensor(np.array(scores)),
-                'labels': torch.tensor(np.array([int(x) for x in labels]))
+                'boxes': torch.tensor(upsize_boxes(boxes, size)).to(torch.device('cuda')),
+                'scores': torch.tensor(np.array(scores)).to(torch.device('cuda')),
+                'labels': torch.tensor(np.array([int(x) for x in labels])).to(torch.device('cuda'))
             })
         return detections
 
