@@ -1,11 +1,15 @@
 import torch
-# from modelos.RetinaNetSimple import RetinaTomatoLightning
-# from modelos.RetinaNetMThres import RetinaMThresTomatoLightning
-from modelos.RetinaNet import RetinaNetTomatoLightning
-from modelos.FasterRCNN import FasterRCNNTomatoLightning
+
+from modelos.RetinaNet import RetinaNetLightning
+from modelos.FasterRCNN import FasterRCNNLightning
+from modelos.FCOS import FCOSLightning
 
 from lightning.pytorch import Trainer
 from lightning.pytorch.loggers import TensorBoardLogger
+
+from Visualize import compare_outputs
+
+from detection.engine import evaluate
 
 def freeze_modules(model, modules=["regression_head"]):
     """
@@ -32,12 +36,14 @@ def model_size(model):
     size_all_mb = (param_size + buffer_size) / 1024**2
     print('model size: {:.3f}MB'.format(size_all_mb))
 
-def load_model(path, model=None, flag=1):
+def load_model(path, model=None, fam="ret", threshold=0.0):
     if model is None:
-        if flag==0:
-            model = RetinaTomatoLightning()
-        else:
-            model = RetinaMThresTomatoLightning()
+        if fam=="ret":
+            model = RetinaLightning(threshold=threshold)
+        elif fam=="fast":
+            model = FasterRCNNLightning(threshold=threshold)
+        elif fam=="fcos":
+            model = FCOSLightning(threshold=threshold)
     model.load_state_dict(torch.load(path))
     return model
 
@@ -53,3 +59,15 @@ logger = TensorBoardLogger("./logs","retinanet")
 #         num_sanity_val_steps=1, 
 #         logger=logger
 #     )
+
+def inference(model, batch):
+    """
+    Función de inferencia de un modelo sobre un conjunto de imágenes.
+    Para comprobar el error asumimos que las imágenes vienen dentro de un
+    dataloader, junto con los ground truths.
+    """
+    images, targets, ids = batch
+    model.eval()
+    outputs = model(images, targets)
+    loss = model.loss_fn(outputs, targets)
+    compare_outputs(images, outputs, targets, loss[0])
