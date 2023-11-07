@@ -131,7 +131,7 @@ def compare(images, bboxess, targetss, labelss, losses):
     for image, bboxes, targets, labels, loss in zip(images, bboxess, targetss, labelss, losses):
         compare_preds(image, bboxes, targets, labels, loss)
 
-def inference(images, outputs, targets, loss):
+def compare_outputs(images, outputs, targets, loss):
     compare(
         images,
         [o['boxes'] for o in outputs],
