@@ -1,71 +1,25 @@
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
+import torch.nn as n
 from lightning.pytorch import LightningModule
-import numpy as np
 
 from torchvision.models import resnet50, ResNet50_Weights
 from torchvision.models.detection import retinanet_resnet50_fpn, RetinaNet_ResNet50_FPN_Weights
 
 from torchvision.models.detection.anchor_utils import AnchorGenerator
-from torchvision.ops import box_iou, sigmoid_focal_loss, boxes as box_ops
-from ensemble_boxes import ensemble_boxes_wbf
 
-import Visualize
+from modelos.utils import image_sizes, compute_loss, threshold_fusion
+
+from objdetecteval.metrics.coco_metrics import get_coco_stats
+from objdetecteval.metrics.image_metrics import get_inference_metrics
+
+from fastcore.basics import patch
 
 if torch.cuda.is_available():
     torch.set_float32_matmul_precision('medium') 
 
 models_dir = "./pths/"
 
-def compute_loss(predictions, targets):
-    losses = []
-    total = 0.
-    for prediction, target in zip(predictions, targets):
-        p_box, p_scores, p_labels = prediction['boxes'], prediction['scores'], prediction['labels']
-        t_box, t_labels = target['boxes'], target['labels']
-        iou = box_iou(t_box, p_box)
-        best_iou, indexes = iou.max(dim=1)
-        class_loss = sigmoid_focal_loss(p_box[indexes],t_box,reduction="sum")
-        box_loss = F.l1_loss(p_box[indexes],t_box, reduction="sum")
-        total += class_loss + box_loss
-        losses.append((class_loss, box_loss))
-    return losses, total
-
-def resize_boxes(boxes, sizes):
-    new_boxes = []
-    for box in boxes:
-        new_boxes.append(
-            [
-                box[0]/sizes[1],
-                box[1]/sizes[0],
-                box[2]/sizes[1],
-                box[3]/sizes[0]
-            ]
-        )
-    return new_boxes
-
-def upsize_boxes(boxes, sizes):
-    new_boxes = []
-    for box in boxes:
-        new_boxes.append(
-            [
-                box[0]*sizes[1],
-                box[1]*sizes[0],
-                box[2]*sizes[1],
-                box[3]*sizes[0]
-            ]
-        )
-    return np.array(new_boxes)
-
-def image_sizes(images):
-    sizes = []
-    for image in images:
-        w, h = image.shape[1:]
-        sizes.append((w,h))
-    return sizes
-
-class RetinaNetTomatoLightning(LightningModule):
+class RetinaNetLightning(LightningModule):
     """
     Clase que contiene el funcionamiento básico de un modelo a efectos de entrenamiento/validación/test.
     Crea un modelo en concreto en base al backbone específicado.
@@ -92,30 +46,13 @@ class RetinaNetTomatoLightning(LightningModule):
     def forward(self, images, targets=None):
         outputs = self.model(images, targets)
         if not self.model.training or targets is None:
-            outputs = self.threshold_fusion(outputs, image_sizes(images))
+            outputs = threshold_fusion(
+                outputs,
+                image_sizes(images),
+                iou_thr=self.iou_thr,
+                skip_box_thr=self.threshold
+            )
         return outputs
-
-    def threshold_fusion(self, outputs, sizes):
-        #Dados los resultados del modelo, los divide en bboxes, scores y labels,
-        #aplica wbf con umbralización, los convierte otra vez a tensores y los devuelve
-        detections = []
-        for output, size in zip(outputs, sizes):
-            #Paso a arrays
-            boxes = output['boxes'].detach().cpu().numpy()
-            scores = output['scores'].detach().cpu().numpy()
-            labels = output['labels'].detach().cpu().numpy()
-            # indexes = np.where(labels == 1)
-            boxes, scores, labels = ensemble_boxes_wbf.weighted_boxes_fusion(
-                [(resize_boxes(boxes, size))],
-                [scores.tolist()],
-                [labels.tolist()],
-                iou_thr=self.iou_thr, skip_box_thr=self.threshold)
-            detections.append({
-                'boxes': torch.tensor(upsize_boxes(boxes, size)).to(torch.device('cuda')),
-                'scores': torch.tensor(np.array(scores)).to(torch.device('cuda')),
-                'labels': torch.tensor(np.array([int(x) for x in labels])).to(torch.device('cuda'))
-            })
-        return detections
 
     def configure_optimizers(self):
         return torch.optim.AdamW(self.model.parameters(), lr=self.lr)
@@ -133,7 +70,8 @@ class RetinaNetTomatoLightning(LightningModule):
         images, targets, ids = batch
         outputs = self(images, targets)
         batch_predictions = {
-            'predictions' : [output['boxes'] for output in outputs],
+            # 'predictions' : [output['boxes'] for output in outputs],
+            'predictions' : outputs,
             'targets' : targets,
             'image_ids' : ids,
         }
@@ -146,18 +84,55 @@ class RetinaNetTomatoLightning(LightningModule):
         images, targets, ids = batch
         outputs = self(images, targets)
         batch_predictions = {
-            'predictions' : [output['boxes'] for output in outputs],
+            # 'predictions' : [output['boxes'] for output in outputs],
+            'predictions' : outputs,
             'targets' : targets,
             'image_ids' : ids,
         }
         loss = self.loss_fn(outputs, targets)
         self.log('test_loss', loss[1])
         return {'loss' : loss[1], 'batch_predictions' : batch_predictions}
-    
-    @torch.no_grad()
-    def predict(self, batch, batch_idx):
-        #Asumimos que estas imágenes residen en un dataloader (test)
-        images, targets, ids = batch
-        outputs = self(images, targets)
-        loss = self.loss_fn(outputs, targets)
-        Visualize.inference(images, outputs, targets, loss[0])
+
+@patch
+def add_pred_outputs(self : RetinaNetLightning, outputs):
+    boxes, scores, labels, image_ids, targets = [],[],[],[],[]
+    for i in range(len(outputs['batch_predictions']['predictions'])):
+        preds = outputs['batch_predictions']['predictions'][i]
+        boxes.append(preds['boxes'])
+        scores.append(preds['scores'])
+        labels.append(preds['labels'])
+        image_ids.append(outputs['batch_predictions']['image_ids'][i])
+        targets.append(outputs['batch_predictions']['targets'][i])
+
+    return (labels, image_ids, boxes, scores, targets)
+
+@patch
+def validation_epoch_end(self : RetinaNetLightning, outputs):
+    """
+    Añadido a cada etapa de validación en el que se evalúan los resultados
+    del modelo con las estadísticas de COCO.
+    """
+    (labels, image_ids, boxes, scores, targets) = self.add_pred_outputs(outputs)
+    # ground_truth_ids = [target['image_id'].detach().item() for target in targets]
+    # ground_truth_boxes = [target['boxes'].detach().tolist() for target in targets]
+    ground_truth_ids, ground_truth_boxes, ground_truth_labels = zip(
+        *[
+            (
+                target['image_id'].detach().item(),
+                target['boxes'].detach().tolist(),
+                target["labels"].detach().tolist()
+            ) for target in targets
+        ]
+    )
+    stats = get_coco_stats(
+        prediction_image_ids = image_ids,
+        predicted_class_confidences = scores,
+        predicted_bboxes = boxes,
+        predicted_class_labels = labels,
+        target_image_ids = ground_truth_ids,
+        target_bboxes = ground_truth_boxes,
+        target_class_labels = ground_truth_labels,
+    )['All']
+    for k in stats.keys():
+        self.log(k, stats[k], on_step=False, on_epoch=True, logger=True)
+    return {'val_loss': outputs['loss'], 'metrics': stats}
