@@ -107,15 +107,13 @@ def add_pred_outputs(self : RetinaNetLightning, outputs):
     return (labels, image_ids, boxes, scores, targets)
 
 @patch
-def validation_epoch_end(self : RetinaNetLightning, outputs):
+def on_validation_epoch_end(self : RetinaNetLightning, outputs):
     """
     Añadido a cada etapa de validación en el que se evalúan los resultados
     del modelo con las estadísticas de COCO.
     """
     (labels, image_ids, boxes, scores, targets) = self.add_pred_outputs(outputs)
-    # ground_truth_ids = [target['image_id'].detach().item() for target in targets]
-    # ground_truth_boxes = [target['boxes'].detach().tolist() for target in targets]
-    ground_truth_ids, ground_truth_boxes, ground_truth_labels = zip(
+    truth_ids, truth_boxes, truth_labels = zip(
         *[
             (
                 target['image_id'].detach().item(),
@@ -129,9 +127,9 @@ def validation_epoch_end(self : RetinaNetLightning, outputs):
         predicted_class_confidences = scores,
         predicted_bboxes = boxes,
         predicted_class_labels = labels,
-        target_image_ids = ground_truth_ids,
-        target_bboxes = ground_truth_boxes,
-        target_class_labels = ground_truth_labels,
+        target_image_ids = truth_ids,
+        target_bboxes = truth_boxes,
+        target_class_labels = truth_labels,
     )['All']
     for k in stats.keys():
         self.log(k, stats[k], on_step=False, on_epoch=True, logger=True)
