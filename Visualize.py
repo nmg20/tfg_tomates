@@ -52,14 +52,29 @@ def draw_bboxes(ax, bboxes, labels=None, linewidth=1.5, color="orange"):
 
 def label_color(label):
     if label==1:
-        return "red"
-    else:
         return "blue"
+    else:
+        return "red"
+
+def sort_by_labels(boxes, labels):
+    """
+    Ordena de forma inversa las bounding boxes y los labels.
+        -> para dibujar los 1s de últimos
+    """
+    s = [(x,y) for x,y in sorted(zip(boxes, labels), key= lambda k:k[1], reverse=True)]
+    bs, ls = [], []
+    for box, label in s:
+        bs.append(box)
+        ls.append(label)
+    boxes, labels = np.stack(bs), np.stack(ls)
+    return boxes, labels
 
 def draw_bboxes_labels(ax, bboxes, labels, linewidth=1.5):
     """
     Dado un axis y un conjunto de bounding boxes (numpy.array), las dibuja
+    Bbox en rojo = bbox bien etiquetada.
     """
+    bboxes, labels = sort_by_labels(bboxes, labels)
     for bbox, label in zip(bboxes, labels):
         bl, w, h = get_rectangle_edges(bbox)
         color = label_color(label)
@@ -98,13 +113,24 @@ def compare_preds(image, bboxes, targets, labels, loss, colors=["orange","red"])
     Dibuja una imagen en un eje y plasma sobre la misma dos conjuntos
     de bounding boxes (tensores).
     """
-    # fig, ax = plt.subplots(1, figsize=(15,15))
     fig, ax = plt.subplots(1)
-    fig.suptitle(f"Loss: {loss}.", fontsize=16)
+    cl = "{:.2e}".format(float(loss[0].detach().cpu().item()))
+    bl = "{:.2e}".format(float(loss[1].detach().cpu().item()))
+    fig.suptitle(f"Class loss: {cl}\tBox loss: {bl}.", fontsize=16)
     image = denormalize(image)
     ax.imshow(image.permute(1,2,0))
-    draw_bboxes(ax,targets.detach().numpy(),labels,linewidth=2,color=colors[0])
-    draw_bboxes_labels(ax,bboxes.detach().numpy(),labels,linewidth=1)
+    draw_bboxes(
+        ax,
+        targets.detach().cpu().numpy(),
+        labels.detach().cpu().numpy(),
+        linewidth=2,
+        color=colors[0]
+    )
+    draw_bboxes_labels(
+        ax,
+        bboxes.detach().cpu().numpy(),
+        labels.detach().cpu().numpy(),
+    )
     plt.show()
 
 def bbox_size(bbox):
@@ -114,20 +140,7 @@ def max_size(bboxes):
     sizes = [bbox_size(bbox) for bbox in bboxes]
     return np.max(sizes)
 
-def equalize(bboxes, targets, ratio=5.0):
-    """
-    bboxes = tensor de bboxes
-    targets = ~
-    """
-    equalized = []
-    max_value = ratio*max_size(targets)
-    for bbox, target in zip(bboxes, targets):
-        if bbox_size(bbox)<=max_value:
-            equalized.append(bbox)
-    return torch.stack(equalized)
-
 def compare(images, bboxess, targetss, labelss, losses):
-    # bboxess = [equalize(bbs, tgs) for bbs, tgs in zip(bboxess, targetss)]
     for image, bboxes, targets, labels, loss in zip(images, bboxess, targetss, labelss, losses):
         compare_preds(image, bboxes, targets, labels, loss)
 
@@ -137,6 +150,6 @@ def compare_outputs(images, outputs, targets, loss):
         [o['boxes'] for o in outputs],
         [t['boxes'] for t in targets],
         [o['labels'] for o in outputs],
-        loss[0]
-        # loss
+        # loss[0]
+        loss
     )
