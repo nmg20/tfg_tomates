@@ -7,7 +7,7 @@ from modelos.FCOS import FCOSLightning
 from lightning.pytorch import Trainer
 from lightning.pytorch.loggers import TensorBoardLogger
 
-from Visualize import compare_outputs
+from Visualize import *
 
 from detection.engine import evaluate
 
@@ -51,14 +51,14 @@ def save_model(model, name):
     torch.save(model.state_dict(), f"{models_dir}/{name}.pt")
 
 logger = TensorBoardLogger("./logs","retinanet")
-# if torch.cuda.is_available():
-#     trainer = Trainer(
-#         accelerator="cuda", 
-#         devices=1,
-#         max_epochs=40, 
-#         num_sanity_val_steps=1, 
-#         logger=logger
-#     )
+if torch.cuda.is_available():
+    trainer = Trainer(
+        accelerator="cuda", 
+        devices=1,
+        max_epochs=40, 
+        num_sanity_val_steps=1, 
+        logger=logger
+    )
 
 def inference(model, batch):
     """
