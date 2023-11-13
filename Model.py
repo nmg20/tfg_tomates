@@ -39,7 +39,7 @@ def model_size(model):
 def load_model(path, model=None, fam="ret", threshold=0.0):
     if model is None:
         if fam=="ret":
-            model = RetinaLightning(threshold=threshold)
+            model = RetinaNetLightning(threshold=threshold)
         elif fam=="fast":
             model = FasterRCNNLightning(threshold=threshold)
         elif fam=="fcos":
@@ -60,12 +60,38 @@ if torch.cuda.is_available():
         logger=logger
     )
 
+def set_num_classes(model, num_classes=1):
+    logits = model.head.classification_head.cls_logits
+    new_class_out = nn.Conv2d(
+        in_channels=logits.in_channels,
+        out_channels=num_classes,
+        kernel_size=logits.kernel_size,
+        stride=logits.stride,
+        padding=logits.padding,
+        dilation=logits.dilation,
+        groups=logits.groups,
+        padding_mode=logits.padding_mode,
+        device=logits.weight.device,
+        dtype=logits.weight.dtype
+    )
+    model.head.classification_head.cls_logits = new_class_out
+
 def inference(model, batch):
     """
     Función de inferencia de un modelo sobre un conjunto de imágenes.
     Para comprobar el error asumimos que las imágenes vienen dentro de un
     dataloader, junto con los ground truths.
     """
+    images, targets, ids = batch
+    model.eval()
+    outputs = model(images, targets)
+    loss = outputs['loss']['classification'],outputs['loss']['bbox_regression']
+    # loss = model.loss_fn(outputs, targets)
+    detections = outputs['detections']
+    compare_outputs(images, detections, targets, loss)
+    # compare_outputs(images, outputs, targets, loss[0])
+
+def inference2(model, batch):
     images, targets, ids = batch
     model.eval()
     outputs = model(images, targets)
