@@ -6,8 +6,10 @@ from ensemble_boxes import ensemble_boxes_wbf
 import os
 
 import numpy as np
-from torchvision.ops import box_iou, sigmoid_focal_loss, boxes as box_ops, complete_box_iou_loss as iou_loss
-from torchmetrics import Precision, Recall 
+from torchvision.ops import box_iou, complete_box_iou_loss as iou_loss
+from torchvision.ops import sigmoid_focal_loss, boxes as box_ops, complete_box_iou_loss as iou_loss
+from torchmetrics import Precision, Recall, Accuracy
+
 # os.system("wget https://raw.githubusercontent.com/pytorch/vision/main/references/detection/engine.py")
 # os.system("wget https://raw.githubusercontent.com/pytorch/vision/main/references/detection/utils.py")
 # os.system("wget https://raw.githubusercontent.com/pytorch/vision/main/references/detection/coco_utils.py")
@@ -95,9 +97,10 @@ def compute_single_loss(boxes1, boxes2, labels1, labels2):
     Complete_Box_IoU_Loss para el error de regresión de las bboxes.
     """
     _, indices = box_iou(boxes2, boxes1).max(dim=1)
-    class_loss = CE(boxes1[indices], boxes2[indices])
+    # class_loss = CE(labels1.float(), labels2[indices].float())
     box_loss = iou_loss(boxes1, boxes2)
-    return class_loss, box_loss
+    # return class_loss, box_loss
+    return box_loss
 
 def compute_loss(detections, targets):
     """
@@ -121,9 +124,17 @@ def compute_loss(detections, targets):
         total_loss += total_loss + class_loss + box_loss
     return total_loss
 
-def get_accuracy(detection, target):
+def get_metrics(detection, target):
+    """
+    Devuelve el cálculo de las métricas de Precisión, Recall y Accuracy
+    para una detección.
+    """
     _, indices = box_iou(target, detection).max(dim=1)
-    return Precision(detection, target)
+    metrics = {
+        'precision': Precision(detection, target),
+        'recall': Recall(detection, target),
+        'accuracy': Accuracy(detection, target)
+    }
 
 # def compute_metrics(detections, targets):
 #     """
