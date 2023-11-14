@@ -50,11 +50,11 @@ def draw_bboxes(ax, bboxes, labels=None, linewidth=1.5, color="orange"):
             )
         )
 
-def label_color(label):
-    if label==1:
-        return "blue"
-    else:
-        return "red"
+# def label_color(label):
+#     if label==1:
+#         return "blue"
+#     else:
+#         return "red"
 
 def sort_by_labels(boxes, labels):
     """
@@ -77,7 +77,7 @@ def draw_bboxes_labels(ax, bboxes, labels, linewidth=1.5):
     bboxes, labels = sort_by_labels(bboxes, labels)
     for bbox, label in zip(bboxes, labels):
         bl, w, h = get_rectangle_edges(bbox)
-        color = label_color(label)
+        color = "red" if label==1 else "blue"
         ax.add_patch(patches.Rectangle(
             bl, w, h,
             linewidth=linewidth,
@@ -108,7 +108,7 @@ def show_bboxes(image : torch.Tensor, bboxes : torch.Tensor,
     draw_bboxes(ax,bboxes.detach().numpy(),labels,linewidth,color)
     plt.show()
 
-def compare_preds(image, bboxes, targets, labels, loss, colors=["orange","red"]):
+def compare_preds(image, bboxes, targets, labels, loss, colors=['orange', 'red']):
     """
     Dibuja una imagen en un eje y plasma sobre la misma dos conjuntos
     de bounding boxes (tensores).
@@ -116,7 +116,7 @@ def compare_preds(image, bboxes, targets, labels, loss, colors=["orange","red"])
     fig, ax = plt.subplots(1)
     cl = "{:.2e}".format(float(loss[0].detach().cpu().item()))
     bl = "{:.2e}".format(float(loss[1].detach().cpu().item()))
-    fig.suptitle(f"Class loss: {cl}\tBox loss: {bl}.", fontsize=16)
+    fig.suptitle(f"Class loss: {cl}  Box loss: {bl}.", fontsize=16)
     image = denormalize(image)
     ax.imshow(image.permute(1,2,0))
     draw_bboxes(
@@ -133,23 +133,12 @@ def compare_preds(image, bboxes, targets, labels, loss, colors=["orange","red"])
     )
     plt.show()
 
-def bbox_size(bbox):
-    return (bbox[2]-bbox[0])*(bbox[3]-bbox[1])
-
-def max_size(bboxes):
-    sizes = [bbox_size(bbox) for bbox in bboxes]
-    return np.max(sizes)
-
-def compare(images, bboxess, targetss, labelss, losses):
-    for image, bboxes, targets, labels, loss in zip(images, bboxess, targetss, labelss, losses):
-        compare_preds(image, bboxes, targets, labels, loss)
-
-def compare_outputs(images, outputs, targets, loss):
-    compare(
-        images,
-        [o['boxes'] for o in outputs],
-        [t['boxes'] for t in targets],
-        [o['labels'] for o in outputs],
-        # loss[0]
-        loss
-    )
+def compare_outputs(images, detections, targets, labels, losses):
+    for i in range(len(images)):
+        compare_preds(
+            images[i],
+            detections[i],
+            targets[i],
+            labels[i],
+            losses[i]
+        )

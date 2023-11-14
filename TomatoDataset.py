@@ -8,13 +8,9 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision.io import read_image
 from lightning.pytorch import LightningDataModule
 from pathlib import Path
-
+import config
 import albumentations as A
 from albumentations.pytorch.transforms import ToTensorV2
-
-main_ds = "../datasets/T1280x720/"
-images_dir = main_ds+"JPEGImages/"
-imagesets_dir = main_ds+"ImageSets/"
 
 class TomatoDatasetAdaptor:
     """
@@ -181,14 +177,13 @@ class TomatoDataModule(LightningDataModule):
         images = torch.stack(images)
         images = images.float()
 
-        boxes = [target["boxes"].float() for target in targets]
-        labels = [target["labels"].float() for target in targets]
+        # boxes = [target["boxes"].float() for target in targets]
+        # labels = [target["labels"].float() for target in targets]
         # image_sizes = torch.tensor([target["image_size"] for target in targets]).float()
-        annotations = {
-            "bbox": boxes,
-            "cls": labels,
+        # annotations = {
+        #     "bbox": boxes,
+        #     "cls": labels,
             # "image_size": image_sizes,
-        }
+        # }
         # return images, annotations, targets, image_ids
         return images, targets, image_ids
-
