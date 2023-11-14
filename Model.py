@@ -9,9 +9,11 @@ from lightning.pytorch.loggers import TensorBoardLogger
 
 from Visualize import *
 
-from detection.engine import evaluate
+from modelos.utils import compute_single_loss
 
-def freeze_modules(model, modules=["regression_head"]):
+import config
+
+def freeze_modules(model, modules=["backbone"]):
     """
     Congela módulos con nombre del modelo.
     """
@@ -36,28 +38,22 @@ def model_size(model):
     size_all_mb = (param_size + buffer_size) / 1024**2
     print('model size: {:.3f}MB'.format(size_all_mb))
 
-def load_model(path, model=None, fam="ret", threshold=0.0):
-    if model is None:
-        if fam=="ret":
-            model = RetinaNetLightning(threshold=threshold)
-        elif fam=="fast":
-            model = FasterRCNNLightning(threshold=threshold)
-        elif fam=="fcos":
-            model = FCOSLightning(threshold=threshold)
+def load_model(model, path):
     model.load_state_dict(torch.load(path))
     return model
 
 def save_model(model, name):
-    torch.save(model.state_dict(), f"{models_dir}/{name}.pt")
+    torch.save(model.state_dict(), f"{config.MODELS_DIR}/{name}.pt")
 
-logger = TensorBoardLogger("./logs","retinanet")
+logger = TensorBoardLogger(config.LOGS_DIR,"retinanet")
 if torch.cuda.is_available():
     trainer = Trainer(
         accelerator="cuda", 
         devices=1,
-        max_epochs=40, 
+        max_epochs=config.NUM_EPOCHS, 
         num_sanity_val_steps=1, 
-        logger=logger
+        logger=logger,
+        # log_save_interval=100
     )
 
 def set_num_classes(model, num_classes=1):
@@ -78,22 +74,20 @@ def set_num_classes(model, num_classes=1):
 
 def inference(model, batch):
     """
-    Función de inferencia de un modelo sobre un conjunto de imágenes.
-    Para comprobar el error asumimos que las imágenes vienen dentro de un
-    dataloader, junto con los ground truths.
+    Dado un modelo y un batch, obtiene el resultado de la inferencia,
+    calcula la loss y dibuja las detecciones por pantalla junto a las
+    ground truths (targets).
     """
     images, targets, ids = batch
     model.eval()
     outputs = model(images, targets)
-    loss = outputs['loss']['classification'],outputs['loss']['bbox_regression']
-    # loss = model.loss_fn(outputs, targets)
-    detections = outputs['detections']
-    compare_outputs(images, detections, targets, loss)
-    # compare_outputs(images, outputs, targets, loss[0])
-
-def inference2(model, batch):
-    images, targets, ids = batch
-    model.eval()
-    outputs = model(images, targets)
-    loss = model.loss_fn(outputs, targets)
-    compare_outputs(images, outputs, targets, loss[0])
+    losses = [
+        compute_single_loss(
+            o['boxes'],
+            t['boxes'],
+            o['labels'],
+            t['labels']) for (o,t) in zip(outputs, targets)]
+    detections = [o['boxes'] for o in outputs]
+    labels = [o['labels'] for o in outputs]
+    gts = [t['boxes'] for t in targets]
+    compare_outputs(images, detections, gts, labels, losses)
