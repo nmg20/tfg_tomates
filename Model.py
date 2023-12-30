@@ -3,6 +3,7 @@ import torch
 from modelos.RetinaNet import RetinaNetLightning
 from modelos.FasterRCNN import FasterRCNNLightning
 from modelos.FCOS import FCOSLightning
+from modelos.SSD import SSDLightning
 
 from lightning.pytorch import Trainer
 from lightning.pytorch.loggers import TensorBoardLogger
@@ -89,5 +90,6 @@ def inference(model, batch):
             t['labels']) for (o,t) in zip(outputs, targets)]
     detections = [o['boxes'] for o in outputs]
     labels = [o['labels'] for o in outputs]
+    scores = [o['scores'] for o in outputs]
     gts = [t['boxes'] for t in targets]
-    compare_outputs(images, detections, gts, labels, losses)
+    compare_outputs(images, detections, gts, labels, scores, losses)

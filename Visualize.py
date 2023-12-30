@@ -40,7 +40,7 @@ def draw_bboxes(ax, bboxes, labels=None, linewidth=1.5, color="orange"):
     """
     Dado un axis y un conjunto de bounding boxes (numpy.array), las dibuja
     """
-    for bbox in bboxes:
+    for bbox, label in zip(bboxes, labels):
         bl, w, h = get_rectangle_edges(bbox)
         ax.add_patch(patches.Rectangle(
             bl, w, h,
@@ -49,12 +49,6 @@ def draw_bboxes(ax, bboxes, labels=None, linewidth=1.5, color="orange"):
             fill=False,
             )
         )
-
-# def label_color(label):
-#     if label==1:
-#         return "blue"
-#     else:
-#         return "red"
 
 def sort_by_labels(boxes, labels):
     """
@@ -69,15 +63,15 @@ def sort_by_labels(boxes, labels):
     boxes, labels = np.stack(bs), np.stack(ls)
     return boxes, labels
 
-def draw_bboxes_labels(ax, bboxes, labels, linewidth=1.5):
+def draw_bboxes_labels(ax, bboxes, labels=None, confs=None, linewidth=1.5):
     """
     Dado un axis y un conjunto de bounding boxes (numpy.array), las dibuja
     Bbox en rojo = bbox bien etiquetada.
     """
     bboxes, labels = sort_by_labels(bboxes, labels)
-    for bbox, label in zip(bboxes, labels):
+    for bbox, label, conf in zip(bboxes, labels, confs):
         bl, w, h = get_rectangle_edges(bbox)
-        color = "red" if label==1 else "blue"
+        color = "blue" if label==1 else "red"
         ax.add_patch(patches.Rectangle(
             bl, w, h,
             linewidth=linewidth,
@@ -85,6 +79,15 @@ def draw_bboxes_labels(ax, bboxes, labels, linewidth=1.5):
             fill=False,
             )
         )
+        if conf:
+            plt.text(
+                bbox[0], bbox[1],
+                s = str(int(100*conf)) + "%",
+                color = "white",
+                verticalalignment = "top",
+                bbox = {"color": color, "pad":0},
+                fontsize=8
+            )
 
 def show_image_tensor(tensor):
     """
@@ -94,6 +97,12 @@ def show_image_tensor(tensor):
     denormalized_tensor = denormalize(tensor)
     plt.imshow(denormalized_tensor.permute(1,2,0))
     plt.show()
+
+def imshow_tensor(tensor):
+    tensor = tensor/2 + 0.5
+    npimg = tensor.numpy()
+    # denormalized_tensor = denormalize(tensor)
+    plt.imshow(np.transpose(npimg,(1,2,0)))
 
 def show_bboxes(image : torch.Tensor, bboxes : torch.Tensor, 
         labels=None, linewidth=2,color="orange"):
@@ -108,7 +117,7 @@ def show_bboxes(image : torch.Tensor, bboxes : torch.Tensor,
     draw_bboxes(ax,bboxes.detach().numpy(),labels,linewidth,color)
     plt.show()
 
-def compare_preds(image, bboxes, targets, labels, loss, colors=['orange', 'red']):
+def compare_preds(image, bboxes, targets, labels, scores, loss, colors=['orange', 'red']):
     """
     Dibuja una imagen en un eje y plasma sobre la misma dos conjuntos
     de bounding boxes (tensores).
@@ -130,15 +139,17 @@ def compare_preds(image, bboxes, targets, labels, loss, colors=['orange', 'red']
         ax,
         bboxes.detach().cpu().numpy(),
         labels.detach().cpu().numpy(),
+        scores.detach().cpu().numpy(),
     )
     plt.show()
 
-def compare_outputs(images, detections, targets, labels, losses):
+def compare_outputs(images, detections, targets, labels, scores, losses):
     for i in range(len(images)):
         compare_preds(
             images[i],
             detections[i],
             targets[i],
             labels[i],
+            scores[i],
             losses[i]
         )
