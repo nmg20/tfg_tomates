@@ -42,7 +42,7 @@ class RetinaNetLightning(LightningModule):
         self.mean_ap = MeanAveragePrecision()
         self.mean_ap.warn_on_many_detections=False
         
-    def forward(self, images, targets=None):
+    def forward(self, images : torch.Tensor, targets=None):
         outputs = self.model(images, targets)
         if not self.model.training or targets is None:
             outputs = threshold_fusion(

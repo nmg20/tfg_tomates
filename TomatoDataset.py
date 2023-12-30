@@ -106,8 +106,11 @@ class TomatoDataModule(LightningDataModule):
     dataloaders. 
         -> opcional: cambiar ruta del dataframe al dataframe directamente(?)
     """
-    # def __init__(self, train_dataframe, val_dataframe, image_dir, batch_size, num_workers):
-    def __init__(self, dfs_path, images_path, batch_size, num_workers):
+    def __init__(self, dfs_path = config.MAIN_DS, 
+            images_path = config.IMAGES_DIR,
+            batch_size = config.BATCH_SIZE,
+            num_workers = config.NUM_WORKERS,
+        ):
         self.train_df_path = f"{dfs_path}labelstrain.csv"
         self.val_df_path = f"{dfs_path}labelsval.csv"
         self.test_df_path = f"{dfs_path}labelstest.csv"

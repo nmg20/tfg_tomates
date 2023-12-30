@@ -4,13 +4,15 @@ import torch
 NUM_CLASSES = 1
 LR = 0.0002
 NUM_EPOCHS = 30
-IOU_THR = 0.5
+IOU_THR = 0.7
 
 #Parámetros del DataModule
 DS_DIR = "../datasets/T1280x720/"
 IMAGES_DIR = DS_DIR + "JPEGImages/"
 IMAGESETS_DIR = DS_DIR + "ImageSets/"
+MAIN_DS = IMAGESETS_DIR + "d801010/"
 BATCH_SIZE = 4
+TEST_BATCH_SIZE = 1
 NUM_WORKERS = 8
 
 #Cuda/CPU
