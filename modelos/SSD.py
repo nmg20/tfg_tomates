@@ -1,14 +1,15 @@
+import numpy as np
 import torch
 import torch.nn as n
 from lightning.pytorch import LightningModule
-
 from torchvision.models.detection import ssd300_vgg16, SSD300_VGG16_Weights
 from torchvision.models.vgg import VGG16_Weights
-
-from modelos.utils import image_sizes, compute_loss, compute_single_loss, threshold_fusion
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
 
+from modelos.utils import image_sizes, compute_loss, compute_single_loss, threshold_fusion
+
 from fastcore.basics import patch
+from neptune.types import File
 
 import sys
 sys.path.append("..")
@@ -91,6 +92,10 @@ class SSDLightning(LightningModule):
         }
         loss = self.loss_fn(outputs, targets)
         mean_ap = self.mean_ap(outputs, targets)
+        # for image, image_id in zip(images,ids):
+        #     self.logger.experiment['test/images'].upload(
+        #         File.as_image(image),
+        #         description=f"image:{image_id}")
         self.log('test_class_loss', loss['class'])
         self.log('test_box_loss', loss['box'])
         for k in config.KEYS:
@@ -102,11 +107,11 @@ def add_pred_outputs(self : SSDLightning, outputs):
     boxes, scores, labels, image_ids, targets = [],[],[],[],[]
     for i in range(len(outputs['batch_predictions']['predictions'])):
         preds = outputs['batch_predictions']['predictions'][i]
-        boxes.append(preds['boxes'])
-        scores.append(preds['scores'])
-        labels.append(preds['labels'])
-        image_ids.append(outputs['batch_predictions']['image_ids'][i])
-        targets.append(outputs['batch_predictions']['targets'][i])
+        boxes.append(preds['boxes'].detach().cpu().numpy())
+        scores.append(preds['scores'].detach().cpu().numpy())
+        labels.append(preds['labels'].detach().cpu().numpy())
+        image_ids.append(outputs['batch_predictions']['image_ids'][i].detach().cpu().numpy())
+        targets.append(outputs['batch_predictions']['targets'][i].detach().cpu().numpy())
 
     return (labels, image_ids, boxes, scores, targets)
 

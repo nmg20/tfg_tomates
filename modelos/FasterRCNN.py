@@ -16,6 +16,10 @@ from objdetecteval.metrics.image_metrics import get_inference_metrics
 
 from fastcore.basics import patch
 
+import sys
+sys.path.append("..")
+import config
+
 if torch.cuda.is_available():
     torch.set_float32_matmul_precision('medium') 
 
@@ -29,10 +33,10 @@ class FasterRCNNLightning(LightningModule):
     """
     def __init__(
         self,
-        num_classes=1,
-        lr=0.0002,
-        threshold=0.1, #Threshold de scores de las bounding boxes
-        iou_thr=0.3, #Threshold de IoU para considerarse la misma bounding box
+        num_classes=config.NUM_CLASSES,
+        lr=config.LR,
+        threshold=0.2, #Threshold de scores de las bounding boxes
+        iou_thr=config.IOU_THR, #Threshold de IoU para considerarse la misma bounding box
     ):
         super().__init__()
         self.lr = lr
@@ -52,7 +56,7 @@ class FasterRCNNLightning(LightningModule):
         if not self.model.training or targets is None:
             outputs = threshold_fusion(
                 outputs,
-                image_sizes(images),
+                images,
                 iou_thr=self.iou_thr,
                 skip_box_thr=self.threshold
             )
@@ -62,40 +66,48 @@ class FasterRCNNLightning(LightningModule):
         return torch.optim.AdamW(self.model.parameters(), lr=self.lr)
 
     def training_step(self, batch, batch_idx):
-        images, targets = batch
-        loss = self(images, targets)
+        images, targets, ids = batch
+        loss = self.forward(images, targets)
         # Registramos el error de clasificación y regresión de bbox
-        self.log('train_class_loss', loss['loss_classifier'].detach())
-        self.log('train_box_loss', loss['loss_box_reg'].detach())
-        self.log('train_objectness', loss['loss_objectness'].detach())
-        self.log('train_rpn_box_loss', loss['loss_rpn_box_reg'].detach())
-        return {'loss' : loss['bbox_regression']}
+        self.log('train_class_loss', loss['classification'].detach())
+        self.log('train_box_loss', loss['bbox_regression'].detach())
+        loss = loss['classification'] + loss['bbox_regression']
+        return loss
 
     @torch.no_grad()
     def validation_step(self, batch, batch_idx):
-        images, targets = batch
-        outputs = self(images, targets)
+        images, targets, ids = batch
+        outputs = self.forward(images, targets)
         batch_predictions = {
-            'predictions' : [output['boxes'] for output in outputs],
+            'predictions' : outputs,
             'targets' : targets,
-            # 'image_ids' : ids,
+            'image_ids' : ids,
         }
         loss = self.loss_fn(outputs, targets)
-        self.log('val_loss', loss[1])
-        return {'loss' : loss[1], 'batch_predictions' : batch_predictions}
+        mean_ap = self.mean_ap(outputs, targets)
+        self.log('val_class_loss', loss['class'])
+        self.log('val_box_loss', loss['box'])
+        for k in config.KEYS:
+            self.log("val_"+k, mean_ap[k], logger=True)
+        return {'loss' : loss['total'], 'batch_predictions' : batch_predictions}
 
     @torch.no_grad()
     def test_step(self, batch, batch_idx):
-        images, targets = batch
-        outputs = self(images, targets)
+        images, targets, ids = batch
+        outputs = self.forward(images, targets)
         batch_predictions = {
-            'predictions' : [output['boxes'] for output in outputs],
+            # 'predictions' : [output['boxes'] for output in outputs],
+            'predictions' : outputs,
             'targets' : targets,
-            # 'image_ids' : ids,
+            'image_ids' : ids,
         }
         loss = self.loss_fn(outputs, targets)
-        self.log('test_loss', loss[1])
-        return {'loss' : loss[1], 'batch_predictions' : batch_predictions}
+        mean_ap = self.mean_ap(outputs, targets)
+        self.log('test_class_loss', loss['class'])
+        self.log('test_box_loss', loss['box'])
+        for k in config.KEYS:
+            self.log("test_"+k, mean_ap[k], logger=True)
+        return {'loss' : loss['total'], 'batch_predictions' : batch_predictions}
 
 @patch
 def add_pred_outputs(self : FasterRCNNLightning, outputs):
