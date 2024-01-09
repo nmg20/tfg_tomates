@@ -54,9 +54,12 @@ def threshold_fusion(outputs, images, iou_thr, skip_box_thr):
     sizes = image_sizes(images)
     for output, size in zip(outputs, sizes):
         #Paso a arrays
-        boxes = output['boxes'].detach().cpu().numpy()
-        scores = output['scores'].detach().cpu().numpy()
-        labels = output['labels'].detach().cpu().numpy()
+        # boxes = output['boxes'].detach().cpu().numpy()
+        boxes = output['boxes']
+        # scores = output['scores'].detach().cpu().numpy()
+        scores = output['scores']
+        # labels = output['labels'].detach().cpu().numpy()
+        labels = output['labels']
         # indexes = np.where(labels == 1)
         boxes, scores, labels = ensemble_boxes_wbf.weighted_boxes_fusion(
             [(resize_boxes(boxes, size))],
@@ -70,6 +73,24 @@ def threshold_fusion(outputs, images, iou_thr, skip_box_thr):
         })
     return detections
 
+def check_box(bboxes):
+    if len(bboxes)>0:
+        return bboxes
+    else:
+        return torch.Tensor([[0,0,0,0]])
+
+def check_label(labels):
+    if len(labels)>0:
+        return labels
+    else:
+        return torch.as_tensor([0.],dtype=torch.long)
+
+def check_boxes(bboxes1, bboxes2):
+    return check_box(bboxes1), check_box(bboxes2)
+
+def check_labels(labels1, labels2):
+    return check_label(labels1, labels2)
+
 def compute_single_loss(boxes1, boxes2, labels1, labels2):
     """
     Función para calcular los dos tipos de loss para una predicción.
@@ -77,6 +98,8 @@ def compute_single_loss(boxes1, boxes2, labels1, labels2):
     Complete_Box_IoU_Loss para el error de regresión de las bboxes.
     """
     ce = CrossEntropyLoss(reduction="mean")
+    boxes1, boxes2 = check_boxes(boxes1, boxes2)
+    labels1, labels2 = check_boxes(labels1, labels2)
     _, indices = box_iou(boxes2, boxes1).max(dim=1)
     class_loss = ce(labels1[indices].float(), labels2.float())
     box_loss = iou_loss(boxes1[indices], boxes2, reduction="mean")
@@ -98,9 +121,9 @@ def compute_loss(detections, targets):
     class_losses, box_losses = 0, 0
     for detection, target in zip(detections, targets):
         p_boxes, t_boxes = detection['boxes'], target['boxes']
-        p_boxes, t_boxes = p_boxes.detach().cpu(), t_boxes.detach().cpu()
+        # p_boxes, t_boxes = p_boxes.detach().cpu(), t_boxes.detach().cpu()
         p_labels, t_labels = detection['labels'], target['labels']
-        p_labels, t_labels = p_labels.detach().cpu(), t_labels.detach().cpu()
+        # p_labels, t_labels = p_labels.detach().cpu(), t_labels.detach().cpu()
         class_loss, box_loss = compute_single_loss(
             p_boxes, t_boxes,
             p_labels, t_labels
