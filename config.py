@@ -3,7 +3,7 @@ import torch
 #Parámetros de entrenamiento
 NUM_CLASSES = 1
 LR = 0.0002
-NUM_EPOCHS = 30
+NUM_EPOCHS = 50
 IOU_THR = 0.7
 
 #Parámetros del DataModule
