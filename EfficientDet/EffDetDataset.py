@@ -126,6 +126,7 @@ class EffDetDataset(Dataset):
 
         target = {
             "bboxes": torch.as_tensor(sample["bboxes"], dtype=torch.float32),
+            "boxes": torch.as_tensor(sample["bboxes"], dtype=torch.float32),
             "labels": torch.as_tensor(labels),
             "image_id": torch.tensor([image_id]),
             "img_size": (new_h, new_w),

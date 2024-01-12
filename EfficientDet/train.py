@@ -11,9 +11,9 @@ neptune_logger = NeptuneLogger(
 )
 
 PARAMS = {
-    "batch_size": config.BATCH_SIZE,
-    "lr": config.LR,
-    "max_epochs": config.NUM_EPOCHS,
+     "batch_size": config.BATCH_SIZE,
+     "lr": config.LR,
+     "max_epochs": config.NUM_EPOCHS,
 }
 
 if torch.cuda.is_available():
@@ -22,7 +22,7 @@ if torch.cuda.is_available():
         devices=1,
         max_epochs=config.NUM_EPOCHS, 
         num_sanity_val_steps=1, 
-        logger=neptune_logger
+        # logger=neptune_logger
     )
 
 dm = EffDetDataModule()
@@ -31,4 +31,4 @@ freeze_layers(model)
 
 trainer.fit(model, dm)
 
-torch.save(model.state_dict(), "../pths/neptune/effdet.pt")
+torch.save(model.state_dict(), "../pths/neptune/effdet_map.pt")

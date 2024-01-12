@@ -25,3 +25,8 @@ MODELS_DIR = "../pths/"
 
 #Logs
 LOGS_DIR = "./logs/"
+
+#MeanAP
+KEYS = ['map','map_50','map_75','map_small','map_medium','map_large',
+    'mar_1','mar_10','mar_100','mar_small','mar_medium','mar_large',
+    'map_per_class', 'mar_100_per_class']

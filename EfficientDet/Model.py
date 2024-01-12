@@ -24,6 +24,7 @@ import matplotlib.pyplot as plt
 
 from fastcore.basics import patch
 from objdetecteval.metrics.coco_metrics import get_coco_stats
+from torchmetrics.detection.mean_ap import MeanAveragePrecision
 
 def create_model(num_classes=1, image_size=512, architecture="tf_efficientnetv2_l"):
     effdet.config.model_config.efficientdet_model_param_dict[architecture] = dict(
@@ -42,53 +43,30 @@ def create_model(num_classes=1, image_size=512, architecture="tf_efficientnetv2_
     )
     return effdet.DetBenchTrain(net, config)
 
-def run_wbf(predictions, image_size=512, iou_thr=0.44, skip_box_thr=0.43, weights=None):
-    bboxes = []
-    confidences = []
-    class_labels = []
-    for prediction in predictions:
-        boxes = [(prediction["boxes"] / image_size).tolist()]
-        scores = [prediction["scores"].tolist()]
-        labels = [prediction["classes"].tolist()]
-        boxes, scores, labels = ensemble_boxes_wbf.weighted_boxes_fusion(
-            boxes,
-            scores,
-            labels,
-            weights=weights,
-            iou_thr=iou_thr,
-            skip_box_thr=skip_box_thr,
-        )
-        boxes = boxes * (image_size - 1)
-        bboxes.append(boxes.tolist())
-        confidences.append(scores.tolist())
-        class_labels.append(labels.tolist())
-    return bboxes, confidences, class_labels
-
 class EffDetModel(LightningModule):
     def __init__(
         self,
-        num_classes=1,
-        img_size=512,
+        num_classes=config.NUM_CLASSES,
+        image_size=512,
         prediction_confidence_threshold=0.4,
-        learning_rate=0.0002,
-        wbf_iou_threshold=0.44,
+        learning_rate=config.LR,
+        wbf_iou_threshold=config.IOU_THR,
         skip_thr=0.43,
-        inference_transforms=get_pred_transforms(target_img_size=512),
         model_architecture='tf_efficientnetv2_l',
     ):
         super().__init__()
-        self.img_size = img_size
+        self.image_size = image_size
         self.model = create_model(
-            num_classes, img_size, architecture=model_architecture
+            num_classes, image_size, architecture=model_architecture
         )
         self.prediction_confidence_threshold = prediction_confidence_threshold
         self.lr = learning_rate
         self.wbf_iou_threshold = wbf_iou_threshold
-        self.inference_tfms = inference_transforms
-        self.output_dir = output_dir
         self.skip_thr = skip_thr
-        self.validation_step_outputs = []
-        self.test_step_outputs = []
+        self.mean_ap = MeanAveragePrecision()
+        self.mean_ap.warn_on_many_detections = False
+        self.validation_outputs = []
+        self.test_outputs = []
     
     def forward(self, images, targets):
         return self.model(images, targets)
@@ -103,8 +81,8 @@ class EffDetModel(LightningModule):
             "class_loss": losses["class_loss"].detach(),
             "box_loss": losses["box_loss"].detach(),
         }
-        self.log("train_loss", losses["loss"], on_epoch=True, prog_bar=True,
-                 logger=True)
+        # self.log("train_loss", losses["loss"], on_epoch=True, prog_bar=True,
+        #          logger=True)
         self.log("train_box_loss", losses["box_loss"],logger=True)
         self.log("train_class_loss", losses["class_loss"],logger=True)
         return losses['loss']
@@ -113,6 +91,7 @@ class EffDetModel(LightningModule):
     def validation_step(self, batch, batch_idx):
         images, annotations, targets, image_ids = batch
         outputs = self.model(images, annotations)
+        self.validation_outputs.append(outputs)
         detections = outputs["detections"]
         batch_predictions = {
             "predictions": detections,
@@ -123,106 +102,64 @@ class EffDetModel(LightningModule):
             "class_loss": outputs["class_loss"].detach(),
             "box_loss": outputs["box_loss"].detach(),
         }
-        self.validation_step_outputs.append(batch_predictions)
-        self.log("valid_loss", outputs["loss"], on_epoch=True, prog_bar=True,
-                 logger=True, sync_dist=True)
+        # self.log("valid_loss", outputs["loss"], on_epoch=True, prog_bar=True,
+        #          logger=True, sync_dist=True)
         self.log("val_box_loss", logging_losses["box_loss"], logger=True)
         self.log("val_class_loss", logging_losses["class_loss"], logger=True)
-        return outputs["loss"]
+        detections = self.process_detections(outputs['detections'], images)
+        mean_ap = self.mean_ap(detections, targets)
+        for k in config.KEYS:
+            self.log("val_"+k, mean_ap[k], logger=True)
+        return {'loss': outputs["loss"], 'batch_predictions': batch_predictions}
 
     @torch.no_grad()
     def test_step(self, batch, batch_idx):
         image, annotations, targets, image_ids = batch
         outputs = self.model(image, annotations)
+        self.test_outputs.append(outputs)
         detections = outputs["detections"]
         batch_predictions = {
             "predictions": detections,
             "targets": targets,
             "image_ids": image_ids,
         }
-        self.test_step_outputs.append(batch_predictions)
         losses = [outputs["loss"],outputs["box_loss"]]
         logging_losses = {"box_loss": outputs["box_loss"].detach(),}
-        self.log("test_loss", outputs["loss"], on_epoch=True, prog_bar=True,
-                 logger=True, sync_dist=True)
+        # self.log("test_loss", outputs["loss"], on_epoch=True, prog_bar=True,
+        #          logger=True, sync_dist=True)
         self.log("test_box_loss", logging_losses["box_loss"], logger=True)
         self.log("test_class_loss", logging_losses["class_loss"], logger=True)
-        return outputs["loss"]
+        mean_ap = self.mean_ap(outputs, targets)
+        for k in config.KEYS:
+            self.log("test_"+k, mean_ap[k], logger=True)
+        return {'loss': outputs["loss"], 'batch_predictions': batch_predictions}
 
-    @typedispatch
-    def predict(self, images: List):
-        image_sizes = [(image.size[1], image.size[0]) for image in images]
-        images_tensor = torch.stack(
-            [
-                self.inference_tfms(
-                    image=np.array(image, dtype=np.float32),
-                    labels=np.ones(1),
-                    bboxes=np.array([[0, 0, 1, 1]]),
-                )["image"]
-                for image in images
-            ]
-        )
-        return self._run_inference(images_tensor, image_sizes)
+    def run_wbf(self, predictions, image_sizes, image_size=512, iou_thr=0.44, skip_box_thr=0.43, weights=None):
+        bboxes = []
+        confidences = []
+        class_labels = []
+        detections = []
 
-    @typedispatch
-    # @torch.inference_mode()
-    def predict(self, images_tensor: torch.Tensor):
-        if images_tensor.ndim == 3:
-            images_tensor = images_tensor.unsqueeze(0)
-        if (
-            images_tensor.shape[-1] != self.img_size
-            or images_tensor.shape[-2] != self.img_size
-        ):
-            raise ValueError(
-                f"Input tensors must be of shape (N, 3, {self.img_size}, {self.img_size})"
+        for prediction, sizes in zip(predictions, image_sizes):
+            boxes = [(prediction["boxes"] / image_size).tolist()]
+            scores = [prediction["scores"].tolist()]
+            labels = [prediction["classes"].tolist()]
+            boxes, scores, labels = ensemble_boxes_wbf.weighted_boxes_fusion(
+                boxes,
+                scores,
+                labels,
+                weights=weights,
+                iou_thr=iou_thr,
+                skip_box_thr=skip_box_thr,
             )
-        num_images = images_tensor.shape[0]
-        image_sizes = [(self.img_size, self.img_size)] * num_images
-        return self._run_inference(images_tensor, image_sizes)
-
-    def _run_inference(self, images_tensor, image_sizes):
-        targets = self._create_dummy_inference_targets(
-            num_images=images_tensor.shape[0]
-            )
-        results = self.model(images_tensor.to(self.device), targets)
-        loss = results['loss']
-        detections = results[
-            "detections"
-        ]
-        (
-            predicted_bboxes,
-            predicted_class_confidences,
-            predicted_class_labels,
-        ) = self.post_process_detections(detections)
-
-        scaled_bboxes = self.__rescale_bboxes(
-            predicted_bboxes=predicted_bboxes, image_sizes=image_sizes
-        )
-        return scaled_bboxes, predicted_class_labels, predicted_class_confidences, loss
-    
-    def _create_dummy_inference_targets(self, num_images, bboxes=None):
-        dummy_targets = {
-            "bbox": [torch.tensor([[0.0, 0.0, 0.0, 0.0]], device=self.device)
-                for i in range(num_images)
-            ],
-            "cls": [torch.tensor([1.0], device=self.device) for i in range(num_images)],
-            "img_size": torch.tensor(
-                [(self.img_size, self.img_size)] * num_images, device=self.device
-            ).float(),
-            "img_scale": torch.ones(num_images, device=self.device).float(),
-        }
-        return dummy_targets
-    
-    def post_process_detections(self, detections):
-        predictions = []
-        for i in range(detections.shape[0]):
-            predictions.append(
-                self._postprocess_single_prediction_detections(detections[i])
-            )
-        predicted_bboxes, predicted_class_confidences, predicted_class_labels = run_wbf(
-            predictions, image_size=self.img_size, iou_thr=self.wbf_iou_threshold, skip_box_thr=self.skip_thr
-        )
-        return predicted_bboxes, predicted_class_confidences, predicted_class_labels
+            boxes = boxes * (image_size - 1)
+            boxes = self.__rescale_bboxes(predicted_bboxes=boxes, image_sizes=sizes)
+            detections.append({
+                'boxes': torch.tensor(boxes).to(config.DEVICE),
+                'scores': torch.tensor(np.array(scores)).to(config.DEVICE),
+                'labels': torch.tensor(np.array([int(x) for x in labels])).to(config.DEVICE)
+            })
+        return detections
 
     def _postprocess_single_prediction_detections(self, detections):
         boxes = detections.detach().cpu().numpy()[:, :4]
@@ -232,141 +169,79 @@ class EffDetModel(LightningModule):
         boxes = boxes[indexes]
         return {"boxes": boxes, "scores": scores[indexes], "classes": classes[indexes]}
 
+    def process_detections(self, detections, images):
+        preds = []
+        for i in range(detections.shape[0]):
+            preds.append(
+                self._postprocess_single_prediction_detections(detections[i])
+            )
+        image_sizes = [(image.shape[1], image.shape[2]) for image in images]
+        predictions = self.run_wbf(
+            preds, image_sizes, image_size=self.image_size, iou_thr=self.wbf_iou_threshold,
+            skip_box_thr=self.skip_thr)
+        return predictions
+
     def __rescale_bboxes(self, predicted_bboxes, image_sizes):
         scaled_bboxes = []
-        for bboxes, img_dims in zip(predicted_bboxes, image_sizes):
-            im_h, im_w = img_dims
+        im_h, im_w = image_sizes
+        for bboxes in predicted_bboxes:
             if len(bboxes) > 0:
                 scaled_bboxes.append(
                     (
                         np.array(bboxes)
                         * [
-                            round(im_w / self.img_size,2),
-                            round(im_h / self.img_size,2),
-                            round(im_w / self.img_size,2),
-                            round(im_h / self.img_size,2),
+                            round(im_w / self.image_size,2),
+                            round(im_h / self.image_size,2),
+                            round(im_w / self.image_size,2),
+                            round(im_h / self.image_size,2),
                         ]
                     ).tolist()
                 )
             else:
                 scaled_bboxes.append(bboxes)
+
         return scaled_bboxes
 
-    @torch.no_grad()
-    def predict_step(self, batch, batch_idx):
-        images, annotations, target, image_ids = batch
-        pred_bboxes, pred_classes, pred_confs, loss = self.model.predict(images)
-        self.log("prediction_loss", loss, on_step=True, on_epoch=True, prog_bar=True,
-                 logger=True, sync_dist=True)
-        return {'loss': loss, 'batch_predictions': pred_bboxes}
+# @patch
+# def add_pred_outputs(self: EffDetModel, outputs):
+#     detections = torch.cat(
+#         [output["batch_predictions"]["predictions"] for output in outputs]
+#     )
+#     image_ids = []
+#     targets = []
+#     for output in outputs:
+#         batch_predictions = output["batch_predictions"]
+#         image_ids.extend(batch_predictions["image_ids"])
+#         targets.extend(batch_predictions["targets"])
+#     (
+#         predicted_bboxes,
+#         predicted_class_confidences,
+#         predicted_class_labels,
+#     ) = self.post_process_detections(detections)
+#     return (
+#         predicted_class_labels,
+#         image_ids,
+#         predicted_bboxes,
+#         predicted_class_confidences,
+#         targets,
+#     )
 
-@patch
-def aggregate_prediction_outputs(self: EffDetModel, outputs):
-    detections = torch.cat(
-        [output["batch_predictions"]["predictions"] for output in outputs]
-    )
-    image_ids = []
-    targets = []
-    for output in outputs:
-        batch_predictions = output["batch_predictions"]
-        image_ids.extend(batch_predictions["image_ids"])
-        targets.extend(batch_predictions["targets"])
-    (
-        predicted_bboxes,
-        predicted_class_confidences,
-        predicted_class_labels,
-    ) = self.post_process_detections(detections)
-    return (
-        predicted_class_labels,
-        image_ids,
-        predicted_bboxes,
-        predicted_class_confidences,
-        targets,
-    )
-
-    @patch
-    def validation_epoch_end(self: EffDetModel, outputs = outputs):
-        """Compute and log training loss and accuracy at the epoch level."""
-        validation_loss_mean = torch.stack(
-            [output["loss"] for output in outputs]
-        ).mean()
-        self.log("mean_val_loss", validation_loss_mean,on_step=False,on_epoch=True,prog_bar=False,
-            logger=True)
-        (
-            predicted_class_labels,
-            image_ids,
-            predicted_bboxes,
-            predicted_class_confidences,
-            targets,
-        ) = self.aggregate_prediction_outputs(outputs)
-
-        truth_image_ids = [target["image_id"].detach().item() for target in targets]
-        truth_boxes = [
-            target["bboxes"].detach()[:, [1, 0, 3, 2]].tolist() for target in targets
-        ]
-        truth_labels = [target["labels"].detach().tolist() for target in targets]
-
-        stats = get_coco_stats(
-            prediction_image_ids=image_ids,
-            predicted_class_confidences=predicted_class_confidences,
-            predicted_bboxes=predicted_bboxes,
-            predicted_class_labels=predicted_class_labels,
-            target_image_ids=truth_image_ids,
-            target_bboxes=truth_boxes,
-            target_class_labels=truth_labels,
-        )['All']
-        for k in stats.keys():
-            self.log(k,stats[k], on_step=False, on_epoch=True, prog_bar=False,
-                     logger=True)
-        return {"val_loss": validation_loss_mean, "metrics": stats}
-
-    @patch
-    def test_epoch_end(self, outputs = outputs):
-        """Compute and log training loss and accuracy at the epoch level."""
-        test_loss_mean = torch.stack(
-            [output["loss"] for output in outputs]
-        ).mean()
-        self.log("mean_test_loss",test_loss_mean,on_step=False,on_epoch=True,prog_bar=False,
-            logger=True)
-
-        (
-            predicted_class_labels,
-            image_ids,
-            predicted_bboxes,
-            predicted_class_confidences,
-            targets,
-        ) = self.aggregate_prediction_outputs(outputs)
-
-        truth_image_ids = [target["image_id"].detach().item() for target in targets]
-        truth_boxes = [
-            target["bboxes"].detach()[:, [1, 0, 3, 2]].tolist() for target in targets
-        ] # convert to xyxy for evaluation
-        truth_labels = [target["labels"].detach().tolist() for target in targets]
-
-        stats = get_coco_stats(
-            prediction_image_ids=image_ids,
-            predicted_class_confidences=predicted_class_confidences,
-            predicted_bboxes=predicted_bboxes,
-            predicted_class_labels=predicted_class_labels,
-            target_image_ids=truth_image_ids,
-            target_bboxes=truth_boxes,
-            target_class_labels=truth_labels,
-        )['All']
-        # Logging de las estadísitcas de COCO
-        for k in stats.keys():
-            self.log(k,stats[k], on_step=False, on_epoch=True, prog_bar=False,
-                     logger=True)
-
-        return {"test_loss": test_loss_mean, "metrics": stats}
+#     @patch
+#     def on_validation_epoch_end(self):
+#         outputs = torch.stack(self.validation_outputs)
+#         print(stats)
+#         for k in config.KEYS:
+#             self.log("mean_val_"+k, stats[k], logger=True)
+#         return {'mean_epoch_val_loss': outputs['loss'], 'metrics': stats}
 
 def load_model(name,conf=0.2, skip=0.43):
-    model = EffDetModel(num_classes=1, img_size=512, prediction_confidence_threshold=conf,
+    model = EffDetModel(num_classes=1, image_size=512, prediction_confidence_threshold=conf,
         skip_thr=skip)
     model.load_state_dict(torch.load(models_dir+"/"+name+".pt"))
     return model
 
-def save_model(model, output):
-    torch.save(model.state_dict(), f"{models_dir}/{output}.pt")
+def save_model(model, name):
+    torch.save(model.state_dict(), f"{models_dir}/{name}.pt")
 
 def freeze_layers(model, layer_min=2, layer_max=4):
     """
