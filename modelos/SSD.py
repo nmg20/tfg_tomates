@@ -67,6 +67,7 @@ class SSDLightning(LightningModule):
     def validation_step(self, batch, batch_idx):
         images, targets, ids = batch
         outputs = self.forward(images, targets)
+        self.validation_outputs.append(outputs)
         batch_predictions = {
             'predictions' : outputs,
             'targets' : targets,
@@ -85,53 +86,25 @@ class SSDLightning(LightningModule):
         images, targets, ids = batch
         outputs = self.forward(images, targets)
         batch_predictions = {
-            # 'predictions' : [output['boxes'] for output in outputs],
             'predictions' : outputs,
             'targets' : targets,
             'image_ids' : ids,
         }
         loss = self.loss_fn(outputs, targets)
         mean_ap = self.mean_ap(outputs, targets)
-        # for image, image_id in zip(images,ids):
-        #     self.logger.experiment['test/images'].upload(
-        #         File.as_image(image),
-        #         description=f"image:{image_id}")
         self.log('test_class_loss', loss['class'])
         self.log('test_box_loss', loss['box'])
         for k in config.KEYS:
             self.log("test_"+k, mean_ap[k], logger=True)
         return {'loss' : loss['total'], 'batch_predictions' : batch_predictions}
 
-@patch
-def add_pred_outputs(self : SSDLightning, outputs):
-    boxes, scores, labels, image_ids, targets = [],[],[],[],[]
-    for i in range(len(outputs['batch_predictions']['predictions'])):
-        preds = outputs['batch_predictions']['predictions'][i]
-        boxes.append(preds['boxes'].detach().cpu().numpy())
-        scores.append(preds['scores'].detach().cpu().numpy())
-        labels.append(preds['labels'].detach().cpu().numpy())
-        image_ids.append(outputs['batch_predictions']['image_ids'][i].detach().cpu().numpy())
-        targets.append(outputs['batch_predictions']['targets'][i].detach().cpu().numpy())
-
-    return (labels, image_ids, boxes, scores, targets)
-
-    @patch 
-    def validation_epoch_end(self, outputs=outputs):
-        """
-        Añadido a cada etapa de validación en el que se evalúan los resultados
-        del modelo con las estadísticas de COCO.
-        """
-        (labels, image_ids, boxes, scores, targets) = self.add_pred_outputs(outputs)
-        truth_ids, truth_boxes, truth_labels = zip(
-            *[
-                (
-                    target['image_id'].detach().item(),
-                    target['boxes'].detach().tolist(),
-                    target["labels"].detach().tolist()
-                ) for target in targets
-            ]
-        )
-        stats = model.mean_ap(outputs)
-        for k in config.KEYS:
-            self.log("mean_val_"+k, stats[k], logger=True)
-        return {'mean_epoch_val_loss': outputs['loss'], 'metrics': stats}
+    # def on_validation_epoch_end(self):
+    #     """
+    #     Añadido a cada etapa de validación en el que se evalúan los resultados
+    #     del modelo con las estadísticas de COCO.
+    #     """
+    #     outputs = torch.stack(self.validation_outputs)
+    #     stats = model.mean_ap(outputs)
+    #     for k in config.KEYS:
+    #         self.log("mean_val_"+k, stats[k], logger=True)
+    #     return {'mean_epoch_val_loss': outputs['loss'], 'metrics': stats}

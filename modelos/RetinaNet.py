@@ -41,6 +41,7 @@ class RetinaNetLightning(LightningModule):
         self.loss_fn = compute_loss
         self.mean_ap = MeanAveragePrecision()
         self.mean_ap.warn_on_many_detections=False
+        self.validation_outputs = []
         
     def forward(self, images : torch.Tensor, targets=None):
         outputs = self.model(images, targets)
@@ -69,6 +70,7 @@ class RetinaNetLightning(LightningModule):
     def validation_step(self, batch, batch_idx):
         images, targets, ids = batch
         outputs = self.forward(images, targets)
+        self.validation_outputs.append(outputs)
         batch_predictions = {
             'predictions' : outputs,
             'targets' : targets,
@@ -100,36 +102,13 @@ class RetinaNetLightning(LightningModule):
             self.log("test_"+k, mean_ap[k], logger=True)
         return {'loss' : loss['total'], 'batch_predictions' : batch_predictions}
 
-@patch
-def add_pred_outputs(self : RetinaNetLightning, outputs):
-    boxes, scores, labels, image_ids, targets = [],[],[],[],[]
-    for i in range(len(outputs['batch_predictions']['predictions'])):
-        preds = outputs['batch_predictions']['predictions'][i]
-        boxes.append(preds['boxes'])
-        scores.append(preds['scores'])
-        labels.append(preds['labels'])
-        image_ids.append(outputs['batch_predictions']['image_ids'][i])
-        targets.append(outputs['batch_predictions']['targets'][i])
-
-    return (labels, image_ids, boxes, scores, targets)
-
-    @patch 
-    def validation_epoch_end(self, outputs=outputs):
-        """
-        Añadido a cada etapa de validación en el que se evalúan los resultados
-        del modelo con las estadísticas de COCO.
-        """
-        (labels, image_ids, boxes, scores, targets) = self.add_pred_outputs(outputs)
-        truth_ids, truth_boxes, truth_labels = zip(
-            *[
-                (
-                    target['image_id'].detach().item(),
-                    target['boxes'].detach().tolist(),
-                    target["labels"].detach().tolist()
-                ) for target in targets
-            ]
-        )
-        stats = model.mean_ap(outputs)
-        for k in config.KEYS:
-            self.log("mean_val_"+k, stats[k], logger=True)
-        return {'mean_epoch_val_loss': outputs['loss'], 'metrics': stats}
+    # def on_validation_epoch_end(self):
+    #     """
+    #     Añadido a cada etapa de validación en el que se evalúan los resultados
+    #     del modelo con las estadísticas de COCO.
+    #     """
+    #     outputs = torch.stack(self.validation_outputs)
+    #     stats = model.mean_ap(outputs)
+    #     for k in config.KEYS:
+    #         self.log("mean_val_"+k, stats[k], logger=True)
+    #     return {'mean_epoch_val_loss': outputs['loss'], 'metrics': stats}
