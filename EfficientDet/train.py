@@ -31,4 +31,4 @@ model = EffDetModel()
 
 trainer.fit(model, dm)
 
-torch.save(model.state_dict(), "../pths/neptune/effdet_map.pt")
+torch.save(model.state_dict(), "../pths/neptune/full/effdet.pt")
