@@ -22,12 +22,12 @@ if torch.cuda.is_available():
         devices=1,
         max_epochs=config.NUM_EPOCHS, 
         num_sanity_val_steps=1, 
-        # logger=neptune_logger
+        logger=neptune_logger
     )
 
 dm = EffDetDataModule()
 model = EffDetModel()
-freeze_layers(model)
+#freeze_layers(model)
 
 trainer.fit(model, dm)
 

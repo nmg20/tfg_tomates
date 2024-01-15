@@ -106,10 +106,10 @@ class EffDetModel(LightningModule):
         #          logger=True, sync_dist=True)
         self.log("val_box_loss", logging_losses["box_loss"], logger=True)
         self.log("val_class_loss", logging_losses["class_loss"], logger=True)
-        detections = self.process_detections(outputs['detections'], images)
-        mean_ap = self.mean_ap(detections, targets)
-        for k in config.KEYS:
-            self.log("val_"+k, mean_ap[k], logger=True)
+        # detections = self.process_detections(outputs['detections'], images)
+        # mean_ap = self.mean_ap(detections, targets)
+        # for k in config.KEYS:
+        #     self.log("val_"+k, mean_ap[k], logger=True)
         return {'loss': outputs["loss"], 'batch_predictions': batch_predictions}
 
     @torch.no_grad()
