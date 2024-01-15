@@ -4,6 +4,7 @@ from modelos.RetinaNet import RetinaNetLightning
 from modelos.FasterRCNN import FasterRCNNLightning
 from modelos.FCOS import FCOSLightning
 from modelos.SSD import SSDLightning
+from modelos.SSDLite import SSDLiteLightning
 
 from lightning.pytorch import Trainer
 from lightning.pytorch.loggers import TensorBoardLogger
@@ -45,17 +46,6 @@ def load_model(model, path):
 
 def save_model(model, name):
     torch.save(model.state_dict(), f"{config.MODELS_DIR}/{name}.pt")
-
-logger = TensorBoardLogger(config.LOGS_DIR,"retinanet")
-if torch.cuda.is_available():
-    trainer = Trainer(
-        accelerator="cuda", 
-        devices=1,
-        max_epochs=config.NUM_EPOCHS, 
-        num_sanity_val_steps=1, 
-        logger=logger,
-        # log_save_interval=100
-    )
 
 def set_num_classes(model, num_classes=1):
     logits = model.head.classification_head.cls_logits
