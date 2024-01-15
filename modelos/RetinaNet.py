@@ -41,7 +41,8 @@ class RetinaNetLightning(LightningModule):
         self.loss_fn = compute_loss
         self.mean_ap = MeanAveragePrecision()
         self.mean_ap.warn_on_many_detections=False
-        self.validation_outputs = []
+        self.val_step_outputs = []
+        self.val_step_targets = []
         
     def forward(self, images : torch.Tensor, targets=None):
         outputs = self.model(images, targets)
@@ -70,45 +71,34 @@ class RetinaNetLightning(LightningModule):
     def validation_step(self, batch, batch_idx):
         images, targets, ids = batch
         outputs = self.forward(images, targets)
-        self.validation_outputs.append(outputs)
-        batch_predictions = {
-            'predictions' : outputs,
-            'targets' : targets,
-            'image_ids' : ids,
-        }
+
         loss = self.loss_fn(outputs, targets)
         mean_ap = self.mean_ap(outputs, targets)
         self.log('val_class_loss', loss['class'])
         self.log('val_box_loss', loss['box'])
-        for k in config.KEYS:
-            self.log("val_"+k, mean_ap[k], logger=True)
-        return {'loss' : loss['total'], 'batch_predictions' : batch_predictions}
+        # for k in config.KEYS:
+        #     self.log("val_"+k, mean_ap[k], logger=True)
+        self.val_step_outputs.extend(outputs)
+        self.val_step_targets.extend(targets)
+        return loss['total']
 
     @torch.no_grad()
     def test_step(self, batch, batch_idx):
         images, targets, ids = batch
         outputs = self.forward(images, targets)
-        batch_predictions = {
-            # 'predictions' : [output['boxes'] for output in outputs],
-            'predictions' : outputs,
-            'targets' : targets,
-            'image_ids' : ids,
-        }
         loss = self.loss_fn(outputs, targets)
-        mean_ap = self.mean_ap(outputs, targets)
         self.log('test_class_loss', loss['class'])
         self.log('test_box_loss', loss['box'])
-        for k in config.KEYS:
-            self.log("test_"+k, mean_ap[k], logger=True)
-        return {'loss' : loss['total'], 'batch_predictions' : batch_predictions}
+        # mean_ap = self.mean_ap(outputs, targets)
+        # for k in config.KEYS:
+        #     self.log("test_"+k, mean_ap[k], logger=True)
+        return loss['total']
 
-    # def on_validation_epoch_end(self):
-    #     """
-    #     Añadido a cada etapa de validación en el que se evalúan los resultados
-    #     del modelo con las estadísticas de COCO.
-    #     """
-    #     outputs = torch.stack(self.validation_outputs)
-    #     stats = model.mean_ap(outputs)
-    #     for k in config.KEYS:
-    #         self.log("mean_val_"+k, stats[k], logger=True)
-    #     return {'mean_epoch_val_loss': outputs['loss'], 'metrics': stats}
+    def on_validation_epoch_end(self):
+        val_all_outputs = self.val_step_outputs
+        val_all_targets = self.val_step_targets
+        mean_ap = self.mean_ap(val_all_outputs, val_all_targets)
+        for k in config.KEYS:
+            self.log("val_"+k, mean_ap[k], logger=True)
+        self.val_step_outputs.clear()
+        self.val_step_targets.clear()
