@@ -5,13 +5,10 @@ from lightning.pytorch import LightningModule
 from torchvision.models import resnet50, ResNet50_Weights
 from torchvision.models.detection import retinanet_resnet50_fpn, RetinaNet_ResNet50_FPN_Weights
 
-from modelos.utils import image_sizes, compute_loss, compute_single_loss, threshold_fusion
+from modelos.utils import images_sizes, compute_loss, threshold_fusion
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
 
 from fastcore.basics import patch
-# from torchvision.models.detection.anchor_utils import AnchorGenerator
-# from objdetecteval.metrics.coco_metrics import get_coco_stats
-# from objdetecteval.metrics.image_metrics import get_inference_metrics
 
 import sys
 sys.path.append("..")
@@ -49,7 +46,7 @@ class RetinaNetLightning(LightningModule):
         if not self.model.training or targets is None:
             outputs = threshold_fusion(
                 outputs,
-                images,
+                images_sizes(images),
                 iou_thr=self.iou_thr,
                 skip_box_thr=self.threshold
             )

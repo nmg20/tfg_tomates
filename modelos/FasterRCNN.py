@@ -5,10 +5,8 @@ from lightning.pytorch import LightningModule
 from torchvision.models import resnet50, ResNet50_Weights
 from torchvision.models.detection import fasterrcnn_resnet50_fpn, FasterRCNN_ResNet50_FPN_Weights
 
-from modelos.utils import image_sizes, compute_loss, compute_single_loss, threshold_fusion
+from modelos.utils import images_sizes, compute_loss, threshold_fusion
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
-
-from fastcore.basics import patch
 
 import sys
 sys.path.append("..")
@@ -46,7 +44,7 @@ class FasterRCNNLightning(LightningModule):
         if not self.model.training or targets is None:
             outputs = threshold_fusion(
                 outputs,
-                images,
+                images_sizes(images),
                 iou_thr=self.iou_thr,
                 skip_box_thr=self.threshold
             )
@@ -93,10 +91,9 @@ class FasterRCNNLightning(LightningModule):
         mean_ap = self.mean_ap(outputs, targets)
         self.log('test_class_loss', loss['class'])
         self.log('test_box_loss', loss['box'])
-        for k in config.KEYS:
-            self.log("test_"+k, mean_ap[k], logger=True)
         return loss['total']
 
+    @torch.no_grad()
     def on_validation_epoch_end(self):
         val_all_outputs = self.val_step_outputs
         val_all_targets = self.val_step_targets

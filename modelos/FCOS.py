@@ -6,8 +6,9 @@ from lightning.pytorch import LightningModule
 from torchvision.models import resnet50, ResNet50_Weights
 from torchvision.models.detection import fcos_resnet50_fpn, FCOS_ResNet50_FPN_Weights
 
+from modelos.utils import images_sizes, compute_loss, threshold_fusion
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
-from modelos.utils import compute_loss, threshold_fusion
+
 
 from fastcore.basics import patch
 import sys
@@ -36,12 +37,12 @@ class FCOSLightning(LightningModule):
         self.val_step_outputs = []
         self.val_step_targets = []
         
-    def forward(self, images, targets=None):
+    def forward(self, images : torch.Tensor, targets=None):
         outputs = self.model(images, targets)
         if not self.model.training or targets is None:
             outputs = threshold_fusion(
                 outputs,
-                images,
+                images_sizes(images),
                 iou_thr=self.iou_thr,
                 skip_box_thr=self.threshold
             )

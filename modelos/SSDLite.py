@@ -6,7 +6,7 @@ from torchvision.models.detection import ssdlite320_mobilenet_v3_large, SSDLite3
 from torchvision.models import MobileNet_V3_Large_Weights
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
 
-from modelos.utils import image_sizes, compute_loss, compute_single_loss, threshold_fusion
+from modelos.utils import images_sizes, compute_loss, threshold_fusion
 
 from fastcore.basics import patch
 from neptune.types import File
@@ -47,7 +47,7 @@ class SSDLiteLightning(LightningModule):
         if not self.model.training or targets is None:
             outputs = threshold_fusion(
                 outputs,
-                images,
+                images_sizes(images),
                 iou_thr=self.iou_thr,
                 skip_box_thr=self.threshold
             )
