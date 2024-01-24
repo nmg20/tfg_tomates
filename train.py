@@ -27,7 +27,7 @@ neptune_logger = NeptuneLogger(
     project="nmg20/tfg",
     api_key="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vYXBwLm5lcHR1bmUuYWkiLCJhcGlfdXJsIjoiaHR0cHM6Ly9hcHAubmVwdHVuZS5haSIsImFwaV9rZXkiOiI3MGM3NzQzMC04NGQ3LTQ4M2UtYjAxMi02YWRhNWM4MTZjODcifQ==",
     log_model_checkpoints=False,
-    tags = ["head_epoch", "torchvision", "ssdlite"]
+    tags = ["502030", "torchvision", "fasterrcnn"]
 )
 
 PARAMS = {
@@ -38,20 +38,22 @@ PARAMS = {
 
 dm = TomatoDataModule()
 #model = SSDLightning(threshold=0.0)
-model = SSDLiteLightning(threshold=0.0)
-#model = FasterRCNNLightning(threshold=0.0)
+#model = SSDLiteLightning(threshold=0.0)
+model = FasterRCNNLightning(threshold=0.0)
 #model = FCOSLightning(threshold=0.0)
-#model = RetinaNetLightning(threshold=0.0)
-freeze_modules(model)
+# model = RetinaNetLightning(threshold=0.0)
+# freeze_modules(model)
 
 trainer = Trainer(
-    accelerator="cuda",
-    devices=1,
+   accelerator="cuda",
+   devices=1,
     max_epochs=config.NUM_EPOCHS,
     num_sanity_val_steps=1,
-    logger=neptune_logger,
+#   logger=neptune_logger,
 )
 
 trainer.fit(model, dm)
 
-torch.save(model.state_dict(), "./pths/neptune/head/ssdlite2.pt")
+# torch.save(model.state_dict(), "./pths/neptune/head/ssdlite2.pt")
+# torch.save(model.state_dict(), "./pths/neptune/701515/faster70.pt")
+torch.save(model.state_dict(), "./pths/neptune/502030/faster50.pt")

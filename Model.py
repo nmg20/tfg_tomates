@@ -5,6 +5,7 @@ from modelos.FasterRCNN import FasterRCNNLightning
 from modelos.FCOS import FCOSLightning
 from modelos.SSD import SSDLightning
 from modelos.SSDLite import SSDLiteLightning
+from modelos.EfficientDet import EfficientDetLightning
 
 from lightning.pytorch import Trainer
 from lightning.pytorch.loggers import TensorBoardLogger
