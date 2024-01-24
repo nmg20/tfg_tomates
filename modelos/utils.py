@@ -10,11 +10,13 @@ from torchvision.ops import box_iou, complete_box_iou_loss as iou_loss
 from torchvision.ops import sigmoid_focal_loss, boxes as box_ops, complete_box_iou_loss as iou_loss
 from torchmetrics import Precision, Recall, Accuracy
 
+from lightning.pytorch.utilities.memory import recursive_detach
+
 import sys
 sys.path.append("..")
 import config
 
-def resize_boxes(boxes, sizes):
+def rescale_boxes(boxes, sizes):
     new_boxes = []
     for box in boxes:
         new_boxes.append(
@@ -40,29 +42,25 @@ def upsize_boxes(boxes, sizes):
         )
     return np.array(new_boxes)
 
-def image_sizes(images):
+def images_sizes(images):
     sizes = []
     for image in images:
         w, h = image.shape[1:]
         sizes.append((w,h))
     return sizes
 
-def threshold_fusion(outputs, images, iou_thr, skip_box_thr):
+def threshold_fusion(outputs, images_sizes, iou_thr, skip_box_thr):
     #Dados los resultados del modelo, los divide en bboxes, scores y labels,
     #aplica wbf con umbralización, los convierte otra vez a tensores y los devuelve
     detections = []
-    sizes = image_sizes(images)
-    for output, size in zip(outputs, sizes):
+    # sizes = image_sizes(images)
+    for output, size in zip(outputs, images_sizes):
         #Paso a arrays
-        # boxes = output['boxes'].detach().cpu().numpy()
         boxes = output['boxes']
-        # scores = output['scores'].detach().cpu().numpy()
         scores = output['scores']
-        # labels = output['labels'].detach().cpu().numpy()
         labels = output['labels']
-        # indexes = np.where(labels == 1)
         boxes, scores, labels = ensemble_boxes_wbf.weighted_boxes_fusion(
-            [(resize_boxes(boxes, size))],
+            [(rescale_boxes(boxes, size))],
             [scores.tolist()],
             [labels.tolist()],
             iou_thr=iou_thr, skip_box_thr=skip_box_thr)
@@ -105,10 +103,10 @@ def compute_single_loss(boxes1, boxes2, labels1, labels2):
     Complete_Box_IoU_Loss para el error de regresión de las bboxes.
     """
     ce = CrossEntropyLoss(reduction="mean")
-    boxes1, boxes2 = check_boxes(boxes1, boxes2)
-    labels1, labels2 = check_labels(labels1, labels2)
+    # boxes1, boxes2 = check_boxes(boxes1, boxes2)
+    # labels1, labels2 = check_labels(labels1, labels2)
     _, indices = box_iou(boxes2, boxes1).max(dim=1)
-    indices.to(config.DEVICE)
+    # indices.to(config.DEVICE)
     class_loss = ce(labels1[indices].float(), labels2.float())
     box_loss = iou_loss(boxes1[indices], boxes2, reduction="mean")
     return class_loss, box_loss
@@ -129,9 +127,11 @@ def compute_loss(detections, targets):
     class_losses, box_losses = 0, 0
     for detection, target in zip(detections, targets):
         p_boxes, t_boxes = detection['boxes'], target['boxes']
-        p_boxes, t_boxes = p_boxes.detach(), t_boxes.detach()
+        # p_boxes, t_boxes = p_boxes.detach(), t_boxes.detach()
+        p_boxes, t_boxes = recursive_detach(p_boxes, to_cpu=True), recursive_detach(t_boxes, to_cpu=True)
         p_labels, t_labels = detection['labels'], target['labels']
-        p_labels, t_labels = p_labels.detach(), t_labels.detach()
+        # p_labels, t_labels = p_labels.detach(), t_labels.detach()
+        p_labels, t_labels = recursive_detach(p_labels, to_cpu=True), recursive_detach(t_labels, to_cpu=True)
         class_loss, box_loss = compute_single_loss(
             p_boxes, t_boxes,
             p_labels, t_labels
@@ -140,21 +140,3 @@ def compute_loss(detections, targets):
         class_losses += class_losses + class_loss
         box_losses += box_losses + box_loss
     return {'total': total_loss, 'class': class_losses, 'box': box_losses}
-
-# def get_metrics(detection, target):
-#     """
-#     Devuelve el cálculo de las métricas de Precisión, Recall y Accuracy
-#     para una detección.
-#     """
-#     _, indices = box_iou(target, detection).max(dim=1)
-#     metrics = {
-#         'precision': Precision(detection, target),
-#         'recall': Recall(detection, target),
-#         'accuracy': Accuracy(detection, target)
-#     }
-
-# def compute_metrics(detections, targets):
-#     """
-#     Calcula la precisión y el recall de una predicción(detections)
-#     en base a unos ground truths(targets).
-#     """
