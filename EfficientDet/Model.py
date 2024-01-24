@@ -134,6 +134,28 @@ class EffDetModel(LightningModule):
             self.log("test_"+k, mean_ap[k], logger=True)
         return {'loss': outputs["loss"], 'batch_predictions': batch_predictions}
 
+    def _run_inference(self, images_tensor):
+        image_sizes = [image.shape[1:] for image in images_tensor]
+        targets = self._create_dummy_inference_targets(
+            num_images=images_tensor.shape[0]
+            )
+        results = self.model(images_tensor.to(self.device), targets)
+        loss = results['loss']
+        detections = results[
+            "detections"
+        ]
+        (
+            predicted_bboxes,
+            predicted_class_confidences,
+            predicted_class_labels,
+        ) = self.post_process_detections(detections)
+
+        scaled_bboxes = self.__rescale_bboxes(
+            predicted_bboxes=predicted_bboxes, image_sizes=image_sizes
+        )
+
+        return scaled_bboxes, predicted_class_labels, predicted_class_confidences, loss
+
     def run_wbf(self, predictions, image_sizes, image_size=512, iou_thr=0.44, skip_box_thr=0.43, weights=None):
         bboxes = []
         confidences = []
@@ -234,10 +256,8 @@ class EffDetModel(LightningModule):
 #             self.log("mean_val_"+k, stats[k], logger=True)
 #         return {'mean_epoch_val_loss': outputs['loss'], 'metrics': stats}
 
-def load_model(name,conf=0.2, skip=0.43):
-    model = EffDetModel(num_classes=1, image_size=512, prediction_confidence_threshold=conf,
-        skip_thr=skip)
-    model.load_state_dict(torch.load(models_dir+"/"+name+".pt"))
+def load_model(model,path):
+    model.load_state_dict(torch.load(path))
     return model
 
 def save_model(model, name):

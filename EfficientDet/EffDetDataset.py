@@ -4,7 +4,6 @@ import torch
 from PIL import Image
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
-# import torchvision.transforms as T
 from torchvision.io import read_image
 from lightning.pytorch import LightningDataModule
 from pathlib import Path
@@ -65,19 +64,6 @@ def get_valid_transforms(target_img_size=512):
     )
 
 def get_test_transforms(target_img_size=512):
-    return A.Compose(
-        [
-            A.Resize(height=target_img_size, width=target_img_size, p=1),
-            A.Normalize(mean, std),
-            ToTensorV2(p=1),
-        ],
-        p=1.0,
-        bbox_params=A.BboxParams(
-            format="pascal_voc", min_area=0, min_visibility=0, label_fields=["labels"]
-        ),
-    )
-
-def get_pred_transforms(target_img_size=512):
     return A.Compose(
         [
             A.Resize(height=target_img_size, width=target_img_size, p=1),
@@ -197,7 +183,7 @@ class EffDetDataModule(LightningDataModule):
     def test_dataloader(self) -> DataLoader:
         test_dataset = self.train_dataset()
         test_loader = torch.utils.data.DataLoader(
-            train_dataset,
+            test_dataset,
             batch_size=self.batch_size,
             shuffle=False,
             pin_memory=False,
